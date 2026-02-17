@@ -4,6 +4,7 @@ import {
   Page,
   View,
   Text,
+  Image,
   StyleSheet,
   Font,
 } from '@react-pdf/renderer';
@@ -647,17 +648,28 @@ function CoverPage({
   site,
   brandName,
   brandColor,
+  logoUrl,
 }: {
   scan: Scan;
   site: Site;
   brandName: string;
   brandColor: string;
+  logoUrl: string | null;
 }) {
   return (
     <Page size="A4" style={s.coverPage}>
       <View style={[s.coverBg, { backgroundColor: COLORS.primary }]}>
         <View style={s.coverTop}>
-          <Text style={s.coverBrandName}>{brandName}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 40 }}>
+            {logoUrl && (
+              // eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf/renderer Image does not support alt
+              <Image
+                src={logoUrl}
+                style={{ width: 32, height: 32, objectFit: 'contain' }}
+              />
+            )}
+            <Text style={[s.coverBrandName, { marginBottom: 0 }]}>{brandName}</Text>
+          </View>
 
           <Text style={s.coverTitle}>
             WCAG 2.1 AA{'\n'}Compliance Report
@@ -1379,6 +1391,7 @@ export function ComplianceReportDocument({ data }: { data: ReportData }) {
         site={site}
         brandName={brandName}
         brandColor={brand.primary}
+        logoUrl={agencySettings?.logo_url ?? null}
       />
 
       <ExecutiveSummaryPage
