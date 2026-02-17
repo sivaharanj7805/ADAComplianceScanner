@@ -1,0 +1,332 @@
+import puppeteer from 'puppeteer';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+
+import type {
+  AxeResults,
+  PageScanResult,
+  PageScanError,
+  PageScanOutcome,
+  ScanErrorCode,
+} from './types';
+import { translateAllViolations } from './translate';
+import { calculateScore } from './score';
+
+/** Timeout for page navigation in milliseconds */
+const NAVIGATION_TIMEOUT = 30_000;
+
+/** Extra delay after domcontentloaded to let JS-rendered content settle */
+const POST_LOAD_DELAY = 2_000;
+
+/** User agent string for our scanner */
+const USER_AGENT =
+  'AccessAudit/1.0 (Accessibility Scanner; +https://accessaudit.com/bot)';
+
+/**
+ * Read the axe-core source from node_modules.
+ * Cached in-memory after first read to avoid repeated disk I/O.
+ */
+let axeCoreSourceCache: string | undefined;
+
+function getAxeCoreSource(): string {
+  if (axeCoreSourceCache === undefined) {
+    const axePath = resolve(
+      process.cwd(),
+      'node_modules',
+      'axe-core',
+      'axe.min.js'
+    );
+    axeCoreSourceCache = readFileSync(axePath, 'utf-8');
+  }
+  return axeCoreSourceCache;
+}
+
+/**
+ * Classify a Puppeteer/network error into a ScanErrorCode and human message.
+ */
+function classifyError(err: unknown): { code: ScanErrorCode; message: string } {
+  const msg = err instanceof Error ? err.message : String(err);
+
+  if (msg.includes('net::ERR_NAME_NOT_RESOLVED') || msg.includes('getaddrinfo ENOTFOUND')) {
+    return {
+      code: 'DNS_FAILURE',
+      message:
+        'The website address could not be found. Please check that the URL is spelled correctly and that the website exists.',
+    };
+  }
+
+  if (
+    msg.includes('net::ERR_CERT') ||
+    msg.includes('SSL') ||
+    msg.includes('ssl') ||
+    msg.includes('CERT_')
+  ) {
+    return {
+      code: 'SSL_ERROR',
+      message:
+        "The website's security certificate has a problem. The site may have an expired or invalid SSL certificate. Please verify the URL uses the correct protocol (http:// or https://).",
+    };
+  }
+
+  if (
+    msg.includes('net::ERR_CONNECTION_REFUSED') ||
+    msg.includes('ECONNREFUSED')
+  ) {
+    return {
+      code: 'CONNECTION_REFUSED',
+      message:
+        'The website refused the connection. The server may be down or blocking automated scans. Please try again later.',
+    };
+  }
+
+  if (
+    msg.includes('TimeoutError') ||
+    msg.includes('timeout') ||
+    msg.includes('Timeout') ||
+    msg.includes('Navigation timeout')
+  ) {
+    return {
+      code: 'TIMEOUT',
+      message:
+        'The page took too long to load (over 30 seconds). This could mean the server is slow or the page is very large. Please try again later.',
+    };
+  }
+
+  if (msg.includes('net::ERR_') || msg.includes('ECONNRESET')) {
+    return {
+      code: 'CONNECTION_REFUSED',
+      message:
+        'Could not connect to the website. The server may be down or experiencing network issues. Please try again later.',
+    };
+  }
+
+  if (msg.includes('crashed') || msg.includes('Target closed')) {
+    return {
+      code: 'PAGE_CRASH',
+      message:
+        'The page caused the browser to crash during scanning. This usually happens with very large or resource-intensive pages.',
+    };
+  }
+
+  return {
+    code: 'UNKNOWN',
+    message: `An unexpected error occurred while scanning: ${msg}. Please try again or contact support if the problem persists.`,
+  };
+}
+
+/**
+ * Validate that a string is a scannable URL.
+ */
+function validateUrl(url: string): { valid: true } | { valid: false; error: PageScanError } {
+  try {
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return {
+        valid: false,
+        error: {
+          url,
+          error: `Only http:// and https:// URLs can be scanned. The URL "${url}" uses "${parsed.protocol}" which is not supported.`,
+          errorCode: 'INVALID_URL',
+          timestamp: new Date().toISOString(),
+        },
+      };
+    }
+    return { valid: true };
+  } catch {
+    return {
+      valid: false,
+      error: {
+        url,
+        error: `"${url}" is not a valid URL. Please include the full address starting with http:// or https://.`,
+        errorCode: 'INVALID_URL',
+        timestamp: new Date().toISOString(),
+      },
+    };
+  }
+}
+
+/**
+ * Scan a single page for accessibility violations.
+ *
+ * This function:
+ * 1. Launches a headless Chromium browser
+ * 2. Navigates to the URL with a 30-second timeout
+ * 3. Waits for the page to be fully loaded
+ * 4. Injects axe-core
+ * 5. Runs axe.run() with WCAG 2.1 AA ruleset
+ * 6. Translates results into plain English
+ * 7. Calculates a compliance score
+ * 8. Returns structured results
+ *
+ * Every error type (timeout, DNS, SSL, 404/500, crash) returns a meaningful
+ * error message instead of crashing.
+ */
+export async function scanPage(url: string): Promise<PageScanOutcome> {
+  // Validate URL first
+  const validation = validateUrl(url);
+  if (!validation.valid) {
+    return { success: false, error: validation.error };
+  }
+
+  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
+
+  try {
+    // Launch headless Chromium
+    browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-software-rasterizer',
+      ],
+    });
+
+    const page = await browser.newPage();
+
+    // Set user agent so sites can identify our scanner
+    await page.setUserAgent(USER_AGENT);
+
+    // Set a reasonable viewport
+    await page.setViewport({ width: 1366, height: 768 });
+
+    // Navigate to the URL — try networkidle0 first, fall back to domcontentloaded
+    let httpStatus: number | null = null;
+    try {
+      const response = await page.goto(url, {
+        waitUntil: 'networkidle0',
+        timeout: NAVIGATION_TIMEOUT,
+      });
+      httpStatus = response?.status() ?? null;
+    } catch (navError) {
+      // If networkidle0 times out, the page might have long-polling connections.
+      // Try domcontentloaded + delay instead.
+      const navMsg = navError instanceof Error ? navError.message : '';
+      if (navMsg.includes('timeout') || navMsg.includes('Timeout')) {
+        try {
+          const response = await page.goto(url, {
+            waitUntil: 'domcontentloaded',
+            timeout: NAVIGATION_TIMEOUT,
+          });
+          httpStatus = response?.status() ?? null;
+          // Give JS-rendered content time to settle
+          await new Promise((r) => setTimeout(r, POST_LOAD_DELAY));
+        } catch (fallbackError) {
+          const classified = classifyError(fallbackError);
+          return {
+            success: false,
+            error: {
+              url,
+              error: classified.message,
+              errorCode: classified.code,
+              timestamp: new Date().toISOString(),
+            },
+          };
+        }
+      } else {
+        const classified = classifyError(navError);
+        return {
+          success: false,
+          error: {
+            url,
+            error: classified.message,
+            errorCode: classified.code,
+            timestamp: new Date().toISOString(),
+          },
+        };
+      }
+    }
+
+    // Check for HTTP errors
+    if (httpStatus && httpStatus >= 400) {
+      const statusMessages: Record<number, string> = {
+        401: 'The page requires authentication (login). We can only scan publicly accessible pages.',
+        403: 'The website blocked our scanner from accessing this page. The server returned a 403 Forbidden error.',
+        404: 'This page does not exist. The server returned a 404 Not Found error. Please check the URL.',
+        500: 'The website is experiencing a server error (500). This is a problem on their end. Please try again later.',
+        502: 'The website returned a Bad Gateway error (502). This is usually a temporary server issue.',
+        503: 'The website is temporarily unavailable (503). It may be undergoing maintenance. Please try again later.',
+      };
+
+      return {
+        success: false,
+        error: {
+          url,
+          error:
+            statusMessages[httpStatus] ??
+            `The website returned an HTTP ${httpStatus} error. Please check the URL and try again.`,
+          errorCode: 'HTTP_ERROR',
+          timestamp: new Date().toISOString(),
+        },
+      };
+    }
+
+    // Get the page title
+    const pageTitle = await page.title();
+
+    // Inject axe-core
+    const axeSource = getAxeCoreSource();
+    await page.evaluate(axeSource);
+
+    // Run axe-core with WCAG 2.1 AA ruleset
+    const axeResults: AxeResults = await page.evaluate(() => {
+      // axe is now available on window after injection
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const axe = (window as any).axe;
+      return axe.run(document, {
+        runOnly: {
+          type: 'tag',
+          values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'],
+        },
+        resultTypes: ['violations', 'passes', 'incomplete', 'inapplicable'],
+      });
+    });
+
+    // Translate violations into plain English
+    const violations = translateAllViolations(axeResults.violations);
+
+    // Calculate compliance score
+    const score = calculateScore(violations);
+
+    // Count total rules checked
+    const totalRuleCount =
+      axeResults.violations.length +
+      axeResults.passes.length +
+      axeResults.incomplete.length +
+      axeResults.inapplicable.length;
+
+    const passingRuleCount = axeResults.passes.length;
+
+    const result: PageScanResult = {
+      url,
+      score,
+      violations,
+      pageTitle: pageTitle || '(No title)',
+      timestamp: new Date().toISOString(),
+      passingRuleCount,
+      totalRuleCount,
+    };
+
+    return { success: true, result };
+  } catch (err) {
+    const classified = classifyError(err);
+    return {
+      success: false,
+      error: {
+        url,
+        error: classified.message,
+        errorCode: classified.code,
+        timestamp: new Date().toISOString(),
+      },
+    };
+  } finally {
+    if (browser) {
+      try {
+        await browser.close();
+      } catch {
+        // Browser may already be closed if it crashed
+      }
+    }
+  }
+}
