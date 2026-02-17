@@ -34,17 +34,27 @@ export default async function DashboardOverview({
   userId,
   greeting,
 }: DashboardOverviewProps) {
-  const [
-    { data: profile },
-    { data: stats },
-    { data: sites },
-    { data: recentScans },
-  ] = await Promise.all([
-    getProfile(userId),
-    getDashboardStats(userId),
-    getSites(userId),
-    getRecentScans(userId, 5),
-  ]);
+  const [profileResult, statsResult, sitesResult, recentScansResult] =
+    await Promise.all([
+      getProfile(userId),
+      getDashboardStats(userId),
+      getSites(userId),
+      getRecentScans(userId, 5),
+    ]);
+
+  // Propagate critical errors to the error boundary
+  if (profileResult.error || statsResult.error) {
+    console.error('[DashboardOverview] Failed to load dashboard data:', {
+      profileError: profileResult.error,
+      statsError: statsResult.error,
+    });
+    throw new Error('Failed to load dashboard data');
+  }
+
+  const profile = profileResult.data;
+  const stats = statsResult.data;
+  const sites = sitesResult.data;
+  const recentScans = recentScansResult.data;
 
   const displayName = profile?.full_name?.split(' ')[0] ?? 'there';
 

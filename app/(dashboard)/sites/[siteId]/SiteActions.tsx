@@ -46,8 +46,13 @@ export default function SiteActions({
         if (result?.error) {
           toast.error(result.error);
         }
-      } catch {
-        // deleteSiteAction redirects on success, so errors here are real failures
+      } catch (err) {
+        // deleteSiteAction redirects on success, which throws a NEXT_REDIRECT error.
+        // Only show an error for non-redirect failures.
+        const message = err instanceof Error ? err.message : '';
+        if (!message.includes('NEXT_REDIRECT')) {
+          toast.error('Failed to delete site. Please try again.');
+        }
       }
     });
   }

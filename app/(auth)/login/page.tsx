@@ -1,13 +1,22 @@
 'use client';
 
 import { useActionState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { signIn, signInWithGoogle, type AuthState } from '../actions';
 
 const initialState: AuthState = {};
 
+const URL_ERROR_MESSAGES: Record<string, string> = {
+  auth_callback_failed: 'Authentication failed. Please try signing in again.',
+  oauth_failed: 'Google sign-in failed. Please try again or use email.',
+};
+
 export default function LoginPage() {
   const [state, formAction, pending] = useActionState(signIn, initialState);
+  const searchParams = useSearchParams();
+  const urlError = searchParams.get('error');
+  const urlErrorMessage = urlError ? URL_ERROR_MESSAGES[urlError] : null;
 
   return (
     <div>
@@ -23,6 +32,13 @@ export default function LoginPage() {
           Start free
         </Link>
       </p>
+
+      {/* URL-based error (e.g., OAuth callback failure) */}
+      {urlErrorMessage && (
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {urlErrorMessage}
+        </div>
+      )}
 
       {/* Google OAuth */}
       <form action={signInWithGoogle} className="mt-8">
