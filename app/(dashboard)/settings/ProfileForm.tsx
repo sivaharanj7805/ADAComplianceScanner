@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { Check, Loader2 } from 'lucide-react';
 import { updateProfileAction } from './actions';
+import { useToastContext } from '@/components/ui/ToastProvider';
 
 interface ProfileFormProps {
   initialName: string;
@@ -20,6 +21,7 @@ export default function ProfileForm({
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [isPending, startTransition] = useTransition();
+  const toast = useToastContext();
 
   async function handleSave() {
     setStatus('saving');
@@ -30,13 +32,21 @@ export default function ProfileForm({
     formData.set('company_name', companyName);
 
     startTransition(async () => {
-      const result = await updateProfileAction(formData);
-      if (result.error) {
+      try {
+        const result = await updateProfileAction(formData);
+        if (result.error) {
+          setStatus('error');
+          setErrorMessage(result.error);
+          toast.error(result.error);
+        } else {
+          setStatus('saved');
+          toast.success('Profile updated successfully.');
+          setTimeout(() => setStatus('idle'), 2000);
+        }
+      } catch {
         setStatus('error');
-        setErrorMessage(result.error);
-      } else {
-        setStatus('saved');
-        setTimeout(() => setStatus('idle'), 2000);
+        setErrorMessage('Something went wrong. Please try again.');
+        toast.error('Failed to save profile. Please check your connection.');
       }
     });
   }

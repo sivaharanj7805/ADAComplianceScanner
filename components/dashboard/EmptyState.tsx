@@ -12,7 +12,7 @@ export default function EmptyState({
   title = 'Add your first site to start monitoring',
   description = 'Start by adding a website URL. We\'ll scan it for ADA/WCAG compliance issues and give you a detailed report in plain English.',
   ctaLabel = 'Add Your First Site',
-  ctaHref = '/dashboard/sites',
+  ctaHref = '/dashboard/sites/new',
 }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-white px-6 py-16 text-center">

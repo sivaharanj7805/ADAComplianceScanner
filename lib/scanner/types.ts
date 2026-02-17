@@ -96,6 +96,7 @@ export type ScanErrorCode =
   | 'DNS_FAILURE'
   | 'SSL_ERROR'
   | 'HTTP_ERROR'
+  | 'AUTH_REQUIRED'
   | 'CONNECTION_REFUSED'
   | 'PAGE_CRASH'
   | 'INVALID_URL'

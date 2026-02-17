@@ -4,6 +4,7 @@ import { useState, useRef, useTransition } from 'react';
 import { Upload, Check, Loader2, X } from 'lucide-react';
 import type { AgencySettings } from '@/lib/types/database';
 import { updateAgencySettingsAction, uploadAgencyLogoAction } from '@/app/(dashboard)/settings/actions';
+import { useToastContext } from '@/components/ui/ToastProvider';
 import ReportPreview from './ReportPreview';
 
 interface AgencyBrandingFormProps {
@@ -21,6 +22,7 @@ export default function AgencyBrandingForm({ initialSettings }: AgencyBrandingFo
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
+  const toast = useToastContext();
 
   async function handleSave() {
     setSaveStatus('saving');
@@ -33,13 +35,21 @@ export default function AgencyBrandingForm({ initialSettings }: AgencyBrandingFo
     formData.set('report_footer_text', footerText);
 
     startTransition(async () => {
-      const result = await updateAgencySettingsAction(formData);
-      if (result.error) {
+      try {
+        const result = await updateAgencySettingsAction(formData);
+        if (result.error) {
+          setSaveStatus('error');
+          setErrorMessage(result.error);
+          toast.error(result.error);
+        } else {
+          setSaveStatus('saved');
+          toast.success('Branding settings saved.');
+          setTimeout(() => setSaveStatus('idle'), 2000);
+        }
+      } catch {
         setSaveStatus('error');
-        setErrorMessage(result.error);
-      } else {
-        setSaveStatus('saved');
-        setTimeout(() => setSaveStatus('idle'), 2000);
+        setErrorMessage('Something went wrong. Please try again.');
+        toast.error('Failed to save settings. Please check your connection.');
       }
     });
   }
@@ -51,14 +61,21 @@ export default function AgencyBrandingForm({ initialSettings }: AgencyBrandingFo
     setUploadingLogo(true);
     setErrorMessage('');
 
-    const formData = new FormData();
-    formData.set('logo', file);
+    try {
+      const formData = new FormData();
+      formData.set('logo', file);
 
-    const result = await uploadAgencyLogoAction(formData);
-    if (result.error) {
-      setErrorMessage(result.error);
-    } else if (result.url) {
-      setLogoUrl(result.url);
+      const result = await uploadAgencyLogoAction(formData);
+      if (result.error) {
+        setErrorMessage(result.error);
+        toast.error(result.error);
+      } else if (result.url) {
+        setLogoUrl(result.url);
+        toast.success('Logo uploaded successfully.');
+      }
+    } catch {
+      setErrorMessage('Failed to upload logo. Please try again.');
+      toast.error('Failed to upload logo. Please check your connection.');
     }
 
     setUploadingLogo(false);

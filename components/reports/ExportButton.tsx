@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { FileDown, Loader2, AlertCircle } from 'lucide-react';
+import { useToastContext } from '@/components/ui/ToastProvider';
 
 interface ExportButtonProps {
   scanId: string;
@@ -10,6 +11,7 @@ interface ExportButtonProps {
 export default function ExportButton({ scanId }: ExportButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToastContext();
 
   async function handleExport() {
     setLoading(true);
@@ -38,8 +40,12 @@ export default function ExportButton({ scanId }: ExportButtonProps) {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+
+      toast.success('Report downloaded successfully.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to export report');
+      const message = err instanceof Error ? err.message : 'Failed to export report';
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }

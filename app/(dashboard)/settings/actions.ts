@@ -18,35 +18,40 @@ const profileSchema = z.object({
 export async function updateProfileAction(
   formData: FormData
 ): Promise<{ error?: string; success?: boolean }> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    return { error: 'Not authenticated' };
+    if (!user) {
+      return { error: 'Not authenticated' };
+    }
+
+    const parsed = profileSchema.safeParse({
+      full_name: formData.get('full_name'),
+      company_name: formData.get('company_name') || undefined,
+    });
+
+    if (!parsed.success) {
+      const fieldErrors = parsed.error.flatten().fieldErrors;
+      const firstMessage = Object.values(fieldErrors).flat()[0];
+      return { error: (firstMessage as string) ?? 'Invalid input' };
+    }
+
+    const { error } = await updateProfile(user.id, {
+      full_name: parsed.data.full_name,
+      company_name: parsed.data.company_name ?? null,
+    });
+
+    if (error) {
+      return { error };
+    }
+
+    revalidatePath('/settings');
+    return { success: true };
+  } catch (err) {
+    console.error('[updateProfileAction] Unexpected error:', err);
+    return { error: 'Failed to update profile. Please try again.' };
   }
-
-  const parsed = profileSchema.safeParse({
-    full_name: formData.get('full_name'),
-    company_name: formData.get('company_name') || undefined,
-  });
-
-  if (!parsed.success) {
-    const fieldErrors = parsed.error.flatten().fieldErrors;
-    const firstMessage = Object.values(fieldErrors).flat()[0];
-    return { error: (firstMessage as string) ?? 'Invalid input' };
-  }
-
-  const { error } = await updateProfile(user.id, {
-    full_name: parsed.data.full_name,
-    company_name: parsed.data.company_name ?? null,
-  });
-
-  if (error) {
-    return { error };
-  }
-
-  revalidatePath('/settings');
-  return { success: true };
 }
 
 // ============================================================================
@@ -63,104 +68,114 @@ const agencySettingsSchema = z.object({
 export async function updateAgencySettingsAction(
   formData: FormData
 ): Promise<{ error?: string; success?: boolean }> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    return { error: 'Not authenticated' };
+    if (!user) {
+      return { error: 'Not authenticated' };
+    }
+
+    // Verify user is on an agency plan
+    const { data: profile } = await getProfile(user.id);
+    if (!profile || !profile.plan.startsWith('agency_')) {
+      return { error: 'Agency plan required' };
+    }
+
+    const parsed = agencySettingsSchema.safeParse({
+      agency_name: formData.get('agency_name'),
+      primary_color: formData.get('primary_color'),
+      secondary_color: formData.get('secondary_color'),
+      report_footer_text: formData.get('report_footer_text') || undefined,
+    });
+
+    if (!parsed.success) {
+      const fieldErrors = parsed.error.flatten().fieldErrors;
+      const firstMessage = Object.values(fieldErrors).flat()[0];
+      return { error: (firstMessage as string) ?? 'Invalid input' };
+    }
+
+    // Check for existing settings
+    const { data: existing } = await getAgencySettings(user.id);
+
+    const { error } = await upsertAgencySettings(
+      user.id,
+      {
+        agency_name: parsed.data.agency_name,
+        primary_color: parsed.data.primary_color,
+        secondary_color: parsed.data.secondary_color,
+        report_footer_text: parsed.data.report_footer_text ?? null,
+      },
+      existing?.id
+    );
+
+    if (error) {
+      return { error };
+    }
+
+    revalidatePath('/settings/agency');
+    return { success: true };
+  } catch (err) {
+    console.error('[updateAgencySettingsAction] Unexpected error:', err);
+    return { error: 'Failed to save branding settings. Please try again.' };
   }
-
-  // Verify user is on an agency plan
-  const { data: profile } = await getProfile(user.id);
-  if (!profile || !profile.plan.startsWith('agency_')) {
-    return { error: 'Agency plan required' };
-  }
-
-  const parsed = agencySettingsSchema.safeParse({
-    agency_name: formData.get('agency_name'),
-    primary_color: formData.get('primary_color'),
-    secondary_color: formData.get('secondary_color'),
-    report_footer_text: formData.get('report_footer_text') || undefined,
-  });
-
-  if (!parsed.success) {
-    const fieldErrors = parsed.error.flatten().fieldErrors;
-    const firstMessage = Object.values(fieldErrors).flat()[0];
-    return { error: (firstMessage as string) ?? 'Invalid input' };
-  }
-
-  // Check for existing settings
-  const { data: existing } = await getAgencySettings(user.id);
-
-  const { error } = await upsertAgencySettings(
-    user.id,
-    {
-      agency_name: parsed.data.agency_name,
-      primary_color: parsed.data.primary_color,
-      secondary_color: parsed.data.secondary_color,
-      report_footer_text: parsed.data.report_footer_text ?? null,
-    },
-    existing?.id
-  );
-
-  if (error) {
-    return { error };
-  }
-
-  revalidatePath('/settings/agency');
-  return { success: true };
 }
 
 export async function uploadAgencyLogoAction(
   formData: FormData
 ): Promise<{ error?: string; url?: string }> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    return { error: 'Not authenticated' };
-  }
+    if (!user) {
+      return { error: 'Not authenticated' };
+    }
 
-  // Verify user is on an agency plan
-  const { data: profile } = await getProfile(user.id);
-  if (!profile || !profile.plan.startsWith('agency_')) {
-    return { error: 'Agency plan required' };
-  }
+    // Verify user is on an agency plan
+    const { data: profile } = await getProfile(user.id);
+    if (!profile || !profile.plan.startsWith('agency_')) {
+      return { error: 'Agency plan required' };
+    }
 
-  const file = formData.get('logo') as File | null;
-  if (!file || file.size === 0) {
-    return { error: 'No file provided' };
-  }
+    const file = formData.get('logo') as File | null;
+    if (!file || file.size === 0) {
+      return { error: 'No file provided' };
+    }
 
-  // Upload to Supabase Storage
-  const { data: uploadData, error: uploadError } = await uploadAgencyLogo(
-    user.id,
-    file
-  );
-
-  if (uploadError || !uploadData) {
-    return { error: uploadError ?? 'Upload failed' };
-  }
-
-  // Update agency_settings with the new logo URL
-  const { data: existing } = await getAgencySettings(user.id);
-
-  if (existing) {
-    await upsertAgencySettings(
+    // Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await uploadAgencyLogo(
       user.id,
-      { logo_url: uploadData.url },
-      existing.id
+      file
     );
-  } else {
-    // Create settings record with logo and defaults
-    await upsertAgencySettings(user.id, {
-      agency_name: profile.company_name ?? 'My Agency',
-      logo_url: uploadData.url,
-      primary_color: '#EA580C',
-      secondary_color: '#0F172A',
-    });
-  }
 
-  revalidatePath('/settings/agency');
-  return { url: uploadData.url };
+    if (uploadError || !uploadData) {
+      return { error: uploadError ?? 'Upload failed' };
+    }
+
+    // Update agency_settings with the new logo URL
+    const { data: existing } = await getAgencySettings(user.id);
+
+    if (existing) {
+      await upsertAgencySettings(
+        user.id,
+        { logo_url: uploadData.url },
+        existing.id
+      );
+    } else {
+      // Create settings record with logo and defaults
+      await upsertAgencySettings(user.id, {
+        agency_name: profile.company_name ?? 'My Agency',
+        logo_url: uploadData.url,
+        primary_color: '#EA580C',
+        secondary_color: '#0F172A',
+      });
+    }
+
+    revalidatePath('/settings/agency');
+    return { url: uploadData.url };
+  } catch (err) {
+    console.error('[uploadAgencyLogoAction] Unexpected error:', err);
+    return { error: 'Failed to upload logo. Please try again.' };
+  }
 }

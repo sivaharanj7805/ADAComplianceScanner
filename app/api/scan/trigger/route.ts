@@ -40,7 +40,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse and validate body
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid request body.' },
+        { status: 400 }
+      );
+    }
     const parsed = triggerScanSchema.safeParse(body);
 
     if (!parsed.success) {
@@ -291,6 +299,7 @@ export async function POST(request: NextRequest) {
       // If scan execution fails, mark it as failed
       const errorMessage =
         err instanceof Error ? err.message : 'Unknown error during scan';
+      console.error(`[POST /api/scan/trigger] Scan execution failed for site ${siteId}:`, err);
       await updateScan(scan.id, {
         status: 'failed',
         error_message: errorMessage,
@@ -298,13 +307,15 @@ export async function POST(request: NextRequest) {
       });
 
       return NextResponse.json(
-        { error: `Scan failed: ${errorMessage}` },
+        { error: 'The scan failed due to an unexpected error. Please try again later.' },
         { status: 500 }
       );
     }
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : 'Internal server error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error('[POST /api/scan/trigger] Unhandled error:', err);
+    return NextResponse.json(
+      { error: 'An unexpected error occurred. Please try again later.' },
+      { status: 500 }
+    );
   }
 }

@@ -12,61 +12,61 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ scanId: string }> }
 ) {
-  const { scanId } = await params;
-
-  // Authenticate
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // Fetch scan + violations
-  const { data: scanData, error: scanError } = await getScanWithViolations(
-    scanId,
-    user.id
-  );
-
-  if (scanError || !scanData) {
-    return NextResponse.json(
-      { error: scanError ?? 'Scan not found' },
-      { status: 404 }
-    );
-  }
-
-  const { scan, violations } = scanData;
-
-  // Fetch site
-  const { data: site, error: siteError } = await getSite(
-    scan.site_id,
-    user.id
-  );
-
-  if (siteError || !site) {
-    return NextResponse.json(
-      { error: siteError ?? 'Site not found' },
-      { status: 404 }
-    );
-  }
-
-  // Fetch profile
-  const { data: profile, error: profileError } = await getProfile(user.id);
-
-  if (profileError || !profile) {
-    return NextResponse.json(
-      { error: profileError ?? 'Profile not found' },
-      { status: 500 }
-    );
-  }
-
-  // Fetch agency settings (may be null for non-agency plans)
-  const { data: agencySettings } = await getAgencySettings(user.id);
-
-  // Generate PDF
   try {
+    const { scanId } = await params;
+
+    // Authenticate
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Fetch scan + violations
+    const { data: scanData, error: scanError } = await getScanWithViolations(
+      scanId,
+      user.id
+    );
+
+    if (scanError || !scanData) {
+      return NextResponse.json(
+        { error: 'Scan not found' },
+        { status: 404 }
+      );
+    }
+
+    const { scan, violations } = scanData;
+
+    // Fetch site
+    const { data: site, error: siteError } = await getSite(
+      scan.site_id,
+      user.id
+    );
+
+    if (siteError || !site) {
+      return NextResponse.json(
+        { error: 'Site not found' },
+        { status: 404 }
+      );
+    }
+
+    // Fetch profile
+    const { data: profile, error: profileError } = await getProfile(user.id);
+
+    if (profileError || !profile) {
+      return NextResponse.json(
+        { error: 'Failed to load profile' },
+        { status: 500 }
+      );
+    }
+
+    // Fetch agency settings (may be null for non-agency plans)
+    const { data: agencySettings } = await getAgencySettings(user.id);
+
+    // Generate PDF
     const pdfBuffer = await generateComplianceReport({
       scan,
       violations,
@@ -92,9 +92,9 @@ export async function GET(
       },
     });
   } catch (err) {
-    console.error('PDF generation failed:', err);
+    console.error('[GET /api/reports] Unhandled error:', err);
     return NextResponse.json(
-      { error: 'Failed to generate report' },
+      { error: 'Failed to generate report. Please try again later.' },
       { status: 500 }
     );
   }
