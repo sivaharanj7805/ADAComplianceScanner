@@ -35,16 +35,22 @@ export default async function SiteDetailContent({
   siteId,
   userId,
 }: SiteDetailContentProps) {
-  const [{ data: site }, { data: scans }] =
-    await Promise.all([
-      getSite(siteId, userId),
-      getScans(siteId, userId, 50),
-    ]);
+  const [siteResult, scansResult] = await Promise.all([
+    getSite(siteId, userId),
+    getScans(siteId, userId, 50),
+  ]);
 
-  if (!site) {
+  if (!siteResult.data) {
     notFound();
   }
 
+  if (scansResult.error) {
+    console.error('[SiteDetailContent] Failed to load scans:', scansResult.error);
+    throw new Error('Failed to load scan data');
+  }
+
+  const site = siteResult.data;
+  const scans = scansResult.data;
   const completedScans = scans.filter((s) => s.status === 'completed');
 
   // Prepare chart data (score history)

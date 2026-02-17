@@ -24,16 +24,24 @@ export default async function ScanDetailContent({
   scanId,
   userId,
 }: ScanDetailContentProps) {
-  const [{ data: scan }, { data: violations }, { data: site }] =
-    await Promise.all([
-      getScan(scanId, userId),
-      getViolations(scanId, userId),
-      getSite(siteId, userId),
-    ]);
+  const [scanResult, violationsResult, siteResult] = await Promise.all([
+    getScan(scanId, userId),
+    getViolations(scanId, userId),
+    getSite(siteId, userId),
+  ]);
 
-  if (!scan || !site) {
+  if (!scanResult.data || !siteResult.data) {
     notFound();
   }
+
+  if (violationsResult.error) {
+    console.error('[ScanDetailContent] Failed to load violations:', violationsResult.error);
+    throw new Error('Failed to load violation data');
+  }
+
+  const scan = scanResult.data;
+  const violations = violationsResult.data;
+  const site = siteResult.data;
 
   const duration =
     scan.started_at && scan.completed_at

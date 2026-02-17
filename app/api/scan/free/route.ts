@@ -119,6 +119,10 @@ export async function POST(request: NextRequest) {
     const outcome = await scanPage(url);
 
     if (!outcome.success) {
+      console.warn(`[POST /api/scan/free] Scan failed for ${url}:`, {
+        errorCode: outcome.error.errorCode,
+        error: outcome.error.error,
+      });
       return NextResponse.json(
         { error: outcome.error.error },
         { status: 422 }

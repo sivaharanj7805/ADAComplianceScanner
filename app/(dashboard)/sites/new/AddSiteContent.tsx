@@ -10,11 +10,21 @@ interface AddSiteContentProps {
 export default async function AddSiteContent({
   userId,
 }: AddSiteContentProps) {
-  const [{ data: sites }, { data: profile }] = await Promise.all([
+  const [sitesResult, profileResult] = await Promise.all([
     getSites(userId),
     getProfile(userId),
   ]);
 
+  if (sitesResult.error || profileResult.error) {
+    console.error('[AddSiteContent] Failed to load data:', {
+      sitesError: sitesResult.error,
+      profileError: profileResult.error,
+    });
+    throw new Error('Failed to load site data');
+  }
+
+  const sites = sitesResult.data;
+  const profile = profileResult.data;
   const sitesLimit = profile?.sites_limit ?? 1;
   const sitesCount = sites.length;
   const atLimit = sitesCount >= sitesLimit;

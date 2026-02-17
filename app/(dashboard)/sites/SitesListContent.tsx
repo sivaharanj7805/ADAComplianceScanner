@@ -11,11 +11,21 @@ interface SitesListContentProps {
 export default async function SitesListContent({
   userId,
 }: SitesListContentProps) {
-  const [{ data: sites }, { data: profile }] = await Promise.all([
+  const [sitesResult, profileResult] = await Promise.all([
     getSites(userId),
     getProfile(userId),
   ]);
 
+  if (sitesResult.error || profileResult.error) {
+    console.error('[SitesListContent] Failed to load sites data:', {
+      sitesError: sitesResult.error,
+      profileError: profileResult.error,
+    });
+    throw new Error('Failed to load sites data');
+  }
+
+  const sites = sitesResult.data;
+  const profile = profileResult.data;
   const atLimit = profile ? sites.length >= profile.sites_limit : false;
 
   return (
