@@ -12,6 +12,8 @@ import type {
   ViolationInsert,
   ScanPageInsert,
   AgencySettings,
+  AgencySettingsInsert,
+  AgencySettingsUpdate,
 } from '@/lib/types/database';
 
 // ============================================================================
@@ -539,6 +541,46 @@ export async function getAgencySettings(
     if (error.code === 'PGRST116') {
       return { data: null, error: null };
     }
+    return { data: null, error: error.message };
+  }
+  return { data, error: null };
+}
+
+export async function upsertAgencySettings(
+  userId: string,
+  settings: Omit<AgencySettingsInsert, 'user_id'> | AgencySettingsUpdate,
+  existingId?: string
+): Promise<{ data: AgencySettings | null; error: string | null }> {
+  const supabase = await createClient();
+
+  if (existingId) {
+    // Update existing record
+    const { data, error } = await supabase
+      .from('agency_settings')
+      .update(settings as AgencySettingsUpdate)
+      .eq('id', existingId)
+      .eq('user_id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      return { data: null, error: error.message };
+    }
+    return { data, error: null };
+  }
+
+  // Insert new record
+  const { data, error } = await supabase
+    .from('agency_settings')
+    .insert({
+      ...settings,
+      user_id: userId,
+      agency_name: (settings as AgencySettingsInsert).agency_name,
+    } as AgencySettingsInsert)
+    .select()
+    .single();
+
+  if (error) {
     return { data: null, error: error.message };
   }
   return { data, error: null };

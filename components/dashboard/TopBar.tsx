@@ -71,7 +71,7 @@ export default function TopBar({ email, fullName, onMenuClick }: TopBarProps) {
       <div className="flex items-center gap-2">
         {/* Add Site button */}
         <Link
-          href="/dashboard/sites"
+          href="/sites/new"
           className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600"
         >
           <Plus className="h-4 w-4" />
@@ -114,7 +114,7 @@ export default function TopBar({ email, fullName, onMenuClick }: TopBarProps) {
                 <p className="text-xs text-gray-500">{email}</p>
               </div>
               <Link
-                href="/dashboard/settings"
+                href="/settings"
                 onClick={() => setDropdownOpen(false)}
                 className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
               >
@@ -122,7 +122,7 @@ export default function TopBar({ email, fullName, onMenuClick }: TopBarProps) {
                 Profile
               </Link>
               <Link
-                href="/dashboard/settings"
+                href="/settings"
                 onClick={() => setDropdownOpen(false)}
                 className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
               >

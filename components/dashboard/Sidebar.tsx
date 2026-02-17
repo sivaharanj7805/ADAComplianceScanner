@@ -24,10 +24,10 @@ interface SidebarProps {
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/dashboard/sites', label: 'Sites', icon: Globe },
-  { href: '/dashboard/scans', label: 'Scans', icon: Search },
-  { href: '/dashboard/reports', label: 'Reports', icon: FileText },
-  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
+  { href: '/sites', label: 'Sites', icon: Globe },
+  { href: '/scans', label: 'Scans', icon: Search },
+  { href: '/reports', label: 'Reports', icon: FileText },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 const PLAN_LABELS: Record<PlanType, string> = {
