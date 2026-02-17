@@ -198,7 +198,7 @@ export async function triggerScanAction(
     }
 
     // Trigger scan via API
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
     const cookieStore = await import('next/headers').then((m) => m.cookies());
     const allCookies = cookieStore.getAll();
     const cookieHeader = allCookies

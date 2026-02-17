@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { Suspense, useActionState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { signIn, signInWithGoogle, type AuthState } from '../actions';
@@ -12,7 +12,7 @@ const URL_ERROR_MESSAGES: Record<string, string> = {
   oauth_failed: 'Google sign-in failed. Please try again or use email.',
 };
 
-export default function LoginPage() {
+function LoginForm() {
   const [state, formAction, pending] = useActionState(signIn, initialState);
   const searchParams = useSearchParams();
   const urlError = searchParams.get('error');
@@ -151,5 +151,13 @@ export default function LoginPage() {
         </button>
       </form>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }
