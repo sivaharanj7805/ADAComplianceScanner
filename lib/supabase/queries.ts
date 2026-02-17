@@ -216,3 +216,116 @@ export async function getScanWithViolations(
     error: null,
   };
 }
+
+// ============================================================================
+// Dashboard aggregations
+// ============================================================================
+
+export async function getDashboardStats(
+  userId: string
+): Promise<{
+  data: {
+    sitesCount: number;
+    sitesLimit: number;
+    averageScore: number | null;
+    totalViolations: number;
+    criticalIssues: number;
+  } | null;
+  error: string | null;
+}> {
+  const supabase = await createClient();
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('sites_limit')
+    .eq('id', userId)
+    .single();
+
+  if (profileError) {
+    return { data: null, error: profileError.message };
+  }
+
+  const { data: sites, error: sitesError } = await supabase
+    .from('sites')
+    .select('current_score, total_violations, critical_violations')
+    .eq('user_id', userId);
+
+  if (sitesError) {
+    return { data: null, error: sitesError.message };
+  }
+
+  type SiteStats = { current_score: number | null; total_violations: number; critical_violations: number };
+  const sitesList: SiteStats[] = sites ?? [];
+  const sitesWithScores = sitesList.filter((s: SiteStats) => s.current_score !== null);
+  const averageScore =
+    sitesWithScores.length > 0
+      ? Math.round(
+          sitesWithScores.reduce((sum: number, s: SiteStats) => sum + (s.current_score ?? 0), 0) /
+            sitesWithScores.length
+        )
+      : null;
+  const totalViolations = sitesList.reduce(
+    (sum: number, s: SiteStats) => sum + s.total_violations,
+    0
+  );
+  const criticalIssues = sitesList.reduce(
+    (sum: number, s: SiteStats) => sum + s.critical_violations,
+    0
+  );
+
+  return {
+    data: {
+      sitesCount: sitesList.length,
+      sitesLimit: profile.sites_limit,
+      averageScore,
+      totalViolations,
+      criticalIssues,
+    },
+    error: null,
+  };
+}
+
+export async function getRecentScans(
+  userId: string,
+  limit = 5
+): Promise<{ data: (Scan & { site_name: string; site_url: string })[]; error: string | null }> {
+  const supabase = await createClient();
+
+  const { data: scans, error: scansError } = await supabase
+    .from('scans')
+    .select('*, sites(name, url)')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (scansError) {
+    return { data: [], error: scansError.message };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = (scans ?? []).map((scan: any) => {
+    const site = scan.sites as { name: string; url: string } | null;
+    return {
+      id: scan.id,
+      site_id: scan.site_id,
+      user_id: scan.user_id,
+      status: scan.status,
+      score: scan.score,
+      total_violations: scan.total_violations,
+      critical_count: scan.critical_count,
+      serious_count: scan.serious_count,
+      moderate_count: scan.moderate_count,
+      minor_count: scan.minor_count,
+      pages_scanned: scan.pages_scanned,
+      pages_total: scan.pages_total,
+      started_at: scan.started_at,
+      completed_at: scan.completed_at,
+      error_message: scan.error_message,
+      created_at: scan.created_at,
+      site_name: site?.name ?? 'Unknown',
+      site_url: site?.url ?? '',
+    } as Scan & { site_name: string; site_url: string };
+  });
+
+  return { data: result, error: null };
+}
