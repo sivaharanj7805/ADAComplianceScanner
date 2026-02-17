@@ -1,7 +1,27 @@
-export default function DashboardLayout({
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import { getProfile } from '@/lib/supabase/queries';
+import DashboardShell from '@/components/dashboard/DashboardShell';
+
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect('/login');
+  }
+
+  const { data: profile } = await getProfile(user.id);
+
+  if (!profile) {
+    redirect('/login');
+  }
+
+  return <DashboardShell profile={profile}>{children}</DashboardShell>;
 }
