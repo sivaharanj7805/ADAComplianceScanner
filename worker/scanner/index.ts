@@ -1,7 +1,5 @@
-// Scanner module entry point
-// All scanner functionality exported from a single location.
+// Scanner module entry point for the worker
 
-// Types
 export type {
   AxeNode,
   AxeViolation,
@@ -12,21 +10,10 @@ export type {
   PageScanOutcome,
   ScanErrorCode,
   CrawlResult,
-  SiteScanResult,
   ViolationTranslation,
 } from './types';
 
-// Page scanning
 export { scanPage } from './scan-page';
-
-// Site crawling
 export { crawlSite } from './crawl-site';
-
-// Violation translation
 export { translateViolation, translateAllViolations } from './translate';
-
-// Compliance scoring
 export { calculateScore } from './score';
-
-// Remote scanning (calls Railway worker over HTTP)
-export { remoteScanPage, remoteCrawlAndScan } from './remote-scan';

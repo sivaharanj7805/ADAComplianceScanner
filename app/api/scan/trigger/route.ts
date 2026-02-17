@@ -12,8 +12,7 @@ import {
   getLastScanTime,
   getViolations,
 } from '@/lib/supabase/queries';
-import { scanPage } from '@/lib/scanner/scan-page';
-import { crawlSite } from '@/lib/scanner/crawl-site';
+import { remoteCrawlAndScan } from '@/lib/scanner/remote-scan';
 import {
   sendScanCompleteEmail,
   sendNewViolationsEmail,
@@ -116,79 +115,68 @@ export async function POST(request: NextRequest) {
     await updateScan(scan.id, { status: 'running' });
 
     try {
-      // Crawl the site to find pages (respect pages_per_site_limit)
+      // Crawl and scan via remote worker (respect pages_per_site_limit)
       const maxPages = profile.pages_per_site_limit;
-      const crawlResult = await crawlSite(site.url, maxPages);
-      const urls = crawlResult.urls;
+      const workerResult = await remoteCrawlAndScan(site.url, maxPages);
 
-      await updateScan(scan.id, { pages_total: urls.length });
+      const { pages, failedPages, pagesScanned, pagesFailed } = workerResult;
 
-      // Scan each page
+      await updateScan(scan.id, { pages_total: pagesScanned + pagesFailed });
+
+      // Process results into DB format
       const allViolations: ViolationInsert[] = [];
       const scanPages: ScanPageInsert[] = [];
-      let pagesScanned = 0;
-      let pagesFailed = 0;
-      let totalScore = 0;
       let criticalCount = 0;
       let seriousCount = 0;
       let moderateCount = 0;
       let minorCount = 0;
 
-      for (const url of urls) {
-        const outcome = await scanPage(url);
+      for (const pageResult of pages) {
+        scanPages.push({
+          scan_id: scan.id,
+          url: pageResult.url,
+          status: 'scanned',
+          violation_count: pageResult.violations.length,
+          score: pageResult.score,
+          scanned_at: new Date().toISOString(),
+        });
 
-        if (outcome.success) {
-          pagesScanned++;
-          totalScore += outcome.result.score;
+        for (const v of pageResult.violations) {
+          const severity = v.severity;
+          if (severity === 'critical') criticalCount += v.instanceCount;
+          else if (severity === 'serious') seriousCount += v.instanceCount;
+          else if (severity === 'moderate') moderateCount += v.instanceCount;
+          else if (severity === 'minor') minorCount += v.instanceCount;
 
-          scanPages.push({
+          allViolations.push({
             scan_id: scan.id,
-            url,
-            status: 'scanned',
-            violation_count: outcome.result.violations.length,
-            score: outcome.result.score,
-            scanned_at: new Date().toISOString(),
-          });
-
-          // Convert TranslatedViolation to ViolationInsert
-          for (const v of outcome.result.violations) {
-            const severity = v.severity;
-            if (severity === 'critical') criticalCount += v.instanceCount;
-            else if (severity === 'serious') seriousCount += v.instanceCount;
-            else if (severity === 'moderate') moderateCount += v.instanceCount;
-            else if (severity === 'minor') minorCount += v.instanceCount;
-
-            allViolations.push({
-              scan_id: scan.id,
-              site_id: siteId,
-              page_url: url,
-              rule_id: v.ruleId,
-              severity: v.severity,
-              impact: v.impact,
-              description: v.description,
-              help_text: v.fix,
-              html_snippet: v.htmlSnippets[0] ?? null,
-              css_selector: v.cssSelectors[0] ?? null,
-              wcag_criteria: v.wcagCriteria,
-              is_new: true,
-            });
-          }
-        } else {
-          pagesFailed++;
-          scanPages.push({
-            scan_id: scan.id,
-            url,
-            status: 'failed',
-            violation_count: 0,
-            score: null,
-            scanned_at: new Date().toISOString(),
+            site_id: siteId,
+            page_url: pageResult.url,
+            rule_id: v.ruleId,
+            severity: v.severity,
+            impact: v.impact,
+            description: v.description,
+            help_text: v.fix,
+            html_snippet: v.htmlSnippets[0] ?? null,
+            css_selector: v.cssSelectors[0] ?? null,
+            wcag_criteria: v.wcagCriteria,
+            is_new: true,
           });
         }
       }
 
-      // Calculate overall score
-      const overallScore =
-        pagesScanned > 0 ? Math.round(totalScore / pagesScanned) : 0;
+      for (const failedPage of failedPages) {
+        scanPages.push({
+          scan_id: scan.id,
+          url: failedPage.url,
+          status: 'failed',
+          violation_count: 0,
+          score: null,
+          scanned_at: new Date().toISOString(),
+        });
+      }
+
+      const overallScore = workerResult.overallScore;
       const totalViolations = allViolations.length;
 
       // Insert violations and scan pages
@@ -207,7 +195,7 @@ export async function POST(request: NextRequest) {
         moderate_count: moderateCount,
         minor_count: minorCount,
         pages_scanned: pagesScanned,
-        pages_total: urls.length,
+        pages_total: pagesScanned + pagesFailed,
         completed_at: new Date().toISOString(),
       });
 

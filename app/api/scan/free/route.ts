@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { scanPage } from '@/lib/scanner';
+import { remoteScanPage } from '@/lib/scanner';
 import type { TranslatedViolation } from '@/lib/scanner';
 
 // ============================================================================
@@ -115,8 +115,8 @@ export async function POST(request: NextRequest) {
 
     const { url } = validation.data;
 
-    // Run the scan
-    const outcome = await scanPage(url);
+    // Run the scan via remote worker
+    const outcome = await remoteScanPage(url);
 
     if (!outcome.success) {
       console.warn(`[POST /api/scan/free] Scan failed for ${url}:`, {
