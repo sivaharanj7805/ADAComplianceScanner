@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { Shield, Scale, FileWarning, Gavel, ChevronDown } from 'lucide-react';
 import ScanForm from '@/components/marketing/ScanForm';
 
@@ -69,31 +68,7 @@ function FAQItem({
 
 export default function FreeScanPage() {
   return (
-    <main className="min-h-screen bg-white">
-      {/* Navigation bar */}
-      <nav className="border-b border-gray-100">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <Shield className="w-7 h-7 text-[#F97316]" />
-            <span className="text-xl font-bold text-gray-900">AccessAudit</span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <a
-              href="/login"
-              className="text-gray-600 hover:text-gray-900 font-medium text-sm transition-colors"
-            >
-              Log in
-            </a>
-            <a
-              href="/signup"
-              className="bg-[#F97316] hover:bg-orange-600 text-white font-semibold text-sm px-4 py-2 rounded-lg transition-colors"
-            >
-              Start Free Trial
-            </a>
-          </div>
-        </div>
-      </nav>
-
+    <>
       {/* Hero Section */}
       <section className="pt-16 sm:pt-24 pb-12 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto text-center">
@@ -231,24 +206,6 @@ export default function FreeScanPage() {
           </p>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="border-t border-gray-800 bg-gray-900 py-8 px-4 sm:px-6">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500">
-          <div className="flex items-center gap-2">
-            <Shield className="w-4 h-4 text-gray-600" />
-            <span>&copy; {new Date().getFullYear()} AccessAudit. All rights reserved.</span>
-          </div>
-          <div className="flex gap-6">
-            <a href="/privacy" className="hover:text-gray-300 transition-colors">
-              Privacy
-            </a>
-            <a href="/terms" className="hover:text-gray-300 transition-colors">
-              Terms
-            </a>
-          </div>
-        </div>
-      </footer>
-    </main>
+    </>
   );
 }
