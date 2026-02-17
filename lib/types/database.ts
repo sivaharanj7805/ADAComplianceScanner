@@ -1,5 +1,8 @@
 // TypeScript types matching the Supabase database schema.
 // Compatible with Supabase's generated type system.
+// IMPORTANT: Row/Insert/Update must be `type` aliases (not `interface`)
+// because interfaces lack implicit index signatures needed by
+// @supabase/postgrest-js's GenericTable constraint.
 
 // ============================================================================
 // Enums
@@ -35,7 +38,7 @@ export type ScanPageStatus = 'pending' | 'scanned' | 'failed';
 // Row types (what you get back from a SELECT)
 // ============================================================================
 
-export interface Profile {
+export type Profile = {
   id: string;
   email: string;
   full_name: string | null;
@@ -48,9 +51,9 @@ export interface Profile {
   pages_per_site_limit: number;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Site {
+export type Site = {
   id: string;
   user_id: string;
   url: string;
@@ -63,9 +66,9 @@ export interface Site {
   critical_violations: number;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Scan {
+export type Scan = {
   id: string;
   site_id: string;
   user_id: string;
@@ -82,9 +85,9 @@ export interface Scan {
   completed_at: string | null;
   error_message: string | null;
   created_at: string;
-}
+};
 
-export interface Violation {
+export type Violation = {
   id: string;
   scan_id: string;
   site_id: string;
@@ -99,9 +102,9 @@ export interface Violation {
   wcag_criteria: string[];
   is_new: boolean;
   created_at: string;
-}
+};
 
-export interface ScanPage {
+export type ScanPage = {
   id: string;
   scan_id: string;
   url: string;
@@ -109,9 +112,9 @@ export interface ScanPage {
   violation_count: number;
   score: number | null;
   scanned_at: string | null;
-}
+};
 
-export interface AgencySettings {
+export type AgencySettings = {
   id: string;
   user_id: string;
   agency_name: string;
@@ -122,13 +125,13 @@ export interface AgencySettings {
   report_footer_text: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
 // ============================================================================
 // Insert types (what you pass to an INSERT — omit generated/default columns)
 // ============================================================================
 
-export interface ProfileInsert {
+export type ProfileInsert = {
   id: string;
   email: string;
   full_name?: string | null;
@@ -139,9 +142,9 @@ export interface ProfileInsert {
   subscription_status?: SubscriptionStatus;
   sites_limit?: number;
   pages_per_site_limit?: number;
-}
+};
 
-export interface SiteInsert {
+export type SiteInsert = {
   id?: string;
   user_id: string;
   url: string;
@@ -152,9 +155,9 @@ export interface SiteInsert {
   current_score?: number | null;
   total_violations?: number;
   critical_violations?: number;
-}
+};
 
-export interface ScanInsert {
+export type ScanInsert = {
   id?: string;
   site_id: string;
   user_id: string;
@@ -170,9 +173,9 @@ export interface ScanInsert {
   started_at?: string | null;
   completed_at?: string | null;
   error_message?: string | null;
-}
+};
 
-export interface ViolationInsert {
+export type ViolationInsert = {
   id?: string;
   scan_id: string;
   site_id: string;
@@ -186,9 +189,9 @@ export interface ViolationInsert {
   css_selector?: string | null;
   wcag_criteria?: string[];
   is_new?: boolean;
-}
+};
 
-export interface ScanPageInsert {
+export type ScanPageInsert = {
   id?: string;
   scan_id: string;
   url: string;
@@ -196,9 +199,9 @@ export interface ScanPageInsert {
   violation_count?: number;
   score?: number | null;
   scanned_at?: string | null;
-}
+};
 
-export interface AgencySettingsInsert {
+export type AgencySettingsInsert = {
   id?: string;
   user_id: string;
   agency_name: string;
@@ -207,13 +210,13 @@ export interface AgencySettingsInsert {
   secondary_color?: string;
   custom_domain?: string | null;
   report_footer_text?: string | null;
-}
+};
 
 // ============================================================================
 // Update types (all fields optional except you can't change id)
 // ============================================================================
 
-export interface ProfileUpdate {
+export type ProfileUpdate = {
   email?: string;
   full_name?: string | null;
   company_name?: string | null;
@@ -223,9 +226,9 @@ export interface ProfileUpdate {
   subscription_status?: SubscriptionStatus;
   sites_limit?: number;
   pages_per_site_limit?: number;
-}
+};
 
-export interface SiteUpdate {
+export type SiteUpdate = {
   user_id?: string;
   url?: string;
   name?: string;
@@ -235,9 +238,9 @@ export interface SiteUpdate {
   current_score?: number | null;
   total_violations?: number;
   critical_violations?: number;
-}
+};
 
-export interface ScanUpdate {
+export type ScanUpdate = {
   status?: ScanStatus;
   score?: number | null;
   total_violations?: number;
@@ -250,9 +253,9 @@ export interface ScanUpdate {
   started_at?: string | null;
   completed_at?: string | null;
   error_message?: string | null;
-}
+};
 
-export interface ViolationUpdate {
+export type ViolationUpdate = {
   severity?: ViolationSeverity;
   impact?: string;
   description?: string;
@@ -261,61 +264,135 @@ export interface ViolationUpdate {
   css_selector?: string | null;
   wcag_criteria?: string[];
   is_new?: boolean;
-}
+};
 
-export interface ScanPageUpdate {
+export type ScanPageUpdate = {
   status?: ScanPageStatus;
   violation_count?: number;
   score?: number | null;
   scanned_at?: string | null;
-}
+};
 
-export interface AgencySettingsUpdate {
+export type AgencySettingsUpdate = {
   agency_name?: string;
   logo_url?: string | null;
   primary_color?: string;
   secondary_color?: string;
   custom_domain?: string | null;
   report_footer_text?: string | null;
-}
+};
 
 // ============================================================================
 // Supabase Database type (compatible with createClient<Database>())
 // ============================================================================
 
-export interface Database {
+export type Database = {
   public: {
     Tables: {
       profiles: {
         Row: Profile;
         Insert: ProfileInsert;
         Update: ProfileUpdate;
+        Relationships: [
+          {
+            foreignKeyName: 'profiles_id_fkey';
+            columns: ['id'];
+            isOneToOne: true;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       sites: {
         Row: Site;
         Insert: SiteInsert;
         Update: SiteUpdate;
+        Relationships: [
+          {
+            foreignKeyName: 'sites_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       scans: {
         Row: Scan;
         Insert: ScanInsert;
         Update: ScanUpdate;
+        Relationships: [
+          {
+            foreignKeyName: 'scans_site_id_fkey';
+            columns: ['site_id'];
+            isOneToOne: false;
+            referencedRelation: 'sites';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'scans_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       violations: {
         Row: Violation;
         Insert: ViolationInsert;
         Update: ViolationUpdate;
+        Relationships: [
+          {
+            foreignKeyName: 'violations_scan_id_fkey';
+            columns: ['scan_id'];
+            isOneToOne: false;
+            referencedRelation: 'scans';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'violations_site_id_fkey';
+            columns: ['site_id'];
+            isOneToOne: false;
+            referencedRelation: 'sites';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       scan_pages: {
         Row: ScanPage;
         Insert: ScanPageInsert;
         Update: ScanPageUpdate;
+        Relationships: [
+          {
+            foreignKeyName: 'scan_pages_scan_id_fkey';
+            columns: ['scan_id'];
+            isOneToOne: false;
+            referencedRelation: 'scans';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       agency_settings: {
         Row: AgencySettings;
         Insert: AgencySettingsInsert;
         Update: AgencySettingsUpdate;
+        Relationships: [
+          {
+            foreignKeyName: 'agency_settings_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: true;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
       };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
     };
     Enums: {
       plan_type: PlanType;
@@ -325,5 +402,8 @@ export interface Database {
       violation_severity: ViolationSeverity;
       scan_page_status: ScanPageStatus;
     };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
   };
-}
+};
