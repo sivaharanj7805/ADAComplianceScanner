@@ -1,8 +1,11 @@
-# ADA Compliance Scanner
+# AccessAudit - ADA Compliance Scanner
+
+## What This Is
+A SaaS product that scans websites for ADA/WCAG 2.1 AA accessibility violations, translates technical violations into plain English that non-technical people can understand, and provides ongoing monitoring with compliance scoring. Three buyer segments: web agencies (manage multiple client sites), e-commerce businesses (fear ADA lawsuits), and municipalities (Title II compliance deadlines).
 
 ## Tech Stack
-- **Framework**: Next.js 14+ (App Router) with TypeScript
-- **Database**: Supabase (PostgreSQL + Auth + Storage)
+- **Framework**: Next.js 14 with App Router, TypeScript
+- **Database**: Supabase (Postgres + Auth + Row Level Security)
 - **Scanning**: axe-core for violation detection, Puppeteer for headless page loading
 - **Payments**: Stripe subscriptions with webhooks
 - **Styling**: Tailwind CSS with shadcn/ui components
