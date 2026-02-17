@@ -18,13 +18,23 @@ import {
 import ScanForm from '@/components/marketing/ScanForm';
 
 export const metadata: Metadata = {
-  title: 'ADA Compliance for E-Commerce | AccessAudit',
+  title: 'Is Your Online Store ADA Compliant? | E-Commerce Accessibility Scanner',
   description:
-    'Is your online store an ADA lawsuit target? 69% of ADA lawsuits target e-commerce. Scan your store free — no signup required.',
+    '69% of ADA lawsuits target e-commerce websites. Scan your online store for WCAG 2.1 AA violations free — no signup required. Plain-English reports with actionable fixes.',
   openGraph: {
-    title: 'Is Your Online Store an ADA Lawsuit Target? | AccessAudit',
+    title: 'Is Your Online Store ADA Compliant? | AccessAudit',
     description:
       '69% of ADA web lawsuits target e-commerce sites. Scan your store for free and get plain-English compliance reports.',
+    url: 'https://www.accessaudit.com/ecommerce',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Is Your Online Store ADA Compliant? | E-Commerce Accessibility Scanner',
+    description:
+      '69% of ADA lawsuits target e-commerce. Scan your store free for WCAG violations.',
+  },
+  alternates: {
+    canonical: 'https://www.accessaudit.com/ecommerce',
   },
 };
 

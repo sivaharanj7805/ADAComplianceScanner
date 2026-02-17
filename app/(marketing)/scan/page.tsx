@@ -3,13 +3,23 @@ import { Shield, Scale, FileWarning, Gavel, ChevronDown } from 'lucide-react';
 import ScanForm from '@/components/marketing/ScanForm';
 
 export const metadata: Metadata = {
-  title: 'Free ADA Compliance Scanner | AccessAudit',
+  title: 'Free ADA Website Compliance Scan | Check WCAG Violations Instantly',
   description:
-    'Scan your website for ADA and WCAG 2.1 AA accessibility violations in seconds. Free, no signup required. See your compliance score and plain-English fixes.',
+    'Scan your website for ADA and WCAG 2.1 AA accessibility violations in seconds. Free, no signup required. Get your compliance score and plain-English fixes instantly.',
   openGraph: {
-    title: 'Free ADA Compliance Scanner | AccessAudit',
+    title: 'Free ADA Website Compliance Scan | AccessAudit',
     description:
-      'Is your website ADA compliant? Find out in 30 seconds with our free accessibility scanner.',
+      'Is your website ADA compliant? Find out in 30 seconds with our free WCAG accessibility scanner. No signup required.',
+    url: 'https://www.accessaudit.com/scan',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Free ADA Website Compliance Scan | Check WCAG Violations Instantly',
+    description:
+      'Scan your website for ADA/WCAG 2.1 AA violations in seconds. Free, no signup required.',
+  },
+  alternates: {
+    canonical: 'https://www.accessaudit.com/scan',
   },
 };
 
@@ -40,6 +50,19 @@ const faqs = [
   },
 ];
 
+const scanFaqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: faqs.map((faq) => ({
+    '@type': 'Question',
+    name: faq.question,
+    acceptedAnswer: {
+      '@type': 'Answer',
+      text: faq.answer,
+    },
+  })),
+};
+
 // ============================================================================
 // FAQ Accordion (server component wrapper for client interactivity)
 // ============================================================================
@@ -69,6 +92,11 @@ function FAQItem({
 export default function FreeScanPage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(scanFaqJsonLd) }}
+      />
+
       {/* Hero Section */}
       <section className="pt-16 sm:pt-24 pb-12 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto text-center">
