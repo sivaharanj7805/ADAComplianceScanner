@@ -10,9 +10,15 @@ import {
   insertViolations,
   insertScanPages,
   getLastScanTime,
+  getViolations,
 } from '@/lib/supabase/queries';
 import { scanPage } from '@/lib/scanner/scan-page';
 import { crawlSite } from '@/lib/scanner/crawl-site';
+import {
+  sendScanCompleteEmail,
+  sendNewViolationsEmail,
+  sendScoreImprovedEmail,
+} from '@/lib/email/send';
 import type { ViolationInsert, ScanPageInsert } from '@/lib/types/database';
 
 const triggerScanSchema = z.object({
@@ -204,6 +210,73 @@ export async function POST(request: NextRequest) {
         critical_violations: criticalCount,
         last_scanned_at: new Date().toISOString(),
       });
+
+      // ── Send email notifications (fire-and-forget) ──────────────────
+      const completedScan = {
+        id: scan.id,
+        score: overallScore,
+        total_violations: totalViolations,
+        critical_count: criticalCount,
+        serious_count: seriousCount,
+        pages_scanned: pagesScanned,
+      };
+
+      // 1. Always send scan-complete email
+      sendScanCompleteEmail(profile, completedScan, site, allViolations).catch(
+        () => {}
+      );
+
+      // 2. Compare with previous scan for new-violations and score-improved emails
+      (async () => {
+        try {
+          // Fetch the last 2 completed scans to compare current vs previous
+          const supabaseClient = await createClient();
+          const { data: recentScans } = await supabaseClient
+            .from('scans')
+            .select('id, score')
+            .eq('site_id', siteId)
+            .eq('status', 'completed')
+            .order('created_at', { ascending: false })
+            .limit(2);
+
+          const prevScan = recentScans && recentScans.length > 1 ? recentScans[1] : null;
+
+          if (prevScan) {
+            // Check for new violations by comparing rule_ids
+            const { data: prevViolations } = await getViolations(
+              prevScan.id,
+              user.id
+            );
+            const prevRuleIds = new Set(
+              prevViolations.map((v) => `${v.rule_id}:${v.page_url}`)
+            );
+            const newViolations = allViolations.filter(
+              (v) => !prevRuleIds.has(`${v.rule_id}:${v.page_url}`)
+            );
+
+            if (newViolations.length > 0) {
+              sendNewViolationsEmail(profile, site, newViolations).catch(
+                () => {}
+              );
+            }
+
+            // Check for score improvement
+            if (
+              prevScan.score !== null &&
+              overallScore > prevScan.score
+            ) {
+              sendScoreImprovedEmail(
+                profile,
+                site,
+                prevScan.score,
+                overallScore
+              ).catch(() => {});
+            }
+          }
+        } catch {
+          // Silently ignore email comparison failures
+        }
+      })();
 
       return NextResponse.json({
         data: {
