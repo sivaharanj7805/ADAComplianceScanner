@@ -4,8 +4,13 @@ import type {
   ProfileUpdate,
   Site,
   SiteInsert,
+  SiteUpdate,
   Scan,
+  ScanInsert,
+  ScanUpdate,
   Violation,
+  ViolationInsert,
+  ScanPageInsert,
 } from '@/lib/types/database';
 
 // ============================================================================
@@ -328,4 +333,189 @@ export async function getRecentScans(
   });
 
   return { data: result, error: null };
+}
+
+// ============================================================================
+// Site management
+// ============================================================================
+
+export async function getSite(
+  siteId: string,
+  userId: string
+): Promise<{ data: Site | null; error: string | null }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('sites')
+    .select('*')
+    .eq('id', siteId)
+    .eq('user_id', userId)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return { data: null, error: 'Site not found' };
+    }
+    return { data: null, error: error.message };
+  }
+  return { data, error: null };
+}
+
+export async function updateSite(
+  siteId: string,
+  userId: string,
+  updates: SiteUpdate
+): Promise<{ data: Site | null; error: string | null }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('sites')
+    .update(updates)
+    .eq('id', siteId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+  return { data, error: null };
+}
+
+// ============================================================================
+// Scan management
+// ============================================================================
+
+export async function createScan(
+  scan: ScanInsert
+): Promise<{ data: Scan | null; error: string | null }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('scans')
+    .insert(scan)
+    .select()
+    .single();
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+  return { data, error: null };
+}
+
+export async function updateScan(
+  scanId: string,
+  updates: ScanUpdate
+): Promise<{ data: Scan | null; error: string | null }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('scans')
+    .update(updates)
+    .eq('id', scanId)
+    .select()
+    .single();
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+  return { data, error: null };
+}
+
+export async function getScan(
+  scanId: string,
+  userId: string
+): Promise<{ data: (Scan & { site_name: string; site_url: string }) | null; error: string | null }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('scans')
+    .select('*, sites(name, url)')
+    .eq('id', scanId)
+    .eq('user_id', userId)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return { data: null, error: 'Scan not found' };
+    }
+    return { data: null, error: error.message };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw = data as any;
+  const site = raw.sites as { name: string; url: string } | null;
+  return {
+    data: {
+      id: raw.id,
+      site_id: raw.site_id,
+      user_id: raw.user_id,
+      status: raw.status,
+      score: raw.score,
+      total_violations: raw.total_violations,
+      critical_count: raw.critical_count,
+      serious_count: raw.serious_count,
+      moderate_count: raw.moderate_count,
+      minor_count: raw.minor_count,
+      pages_scanned: raw.pages_scanned,
+      pages_total: raw.pages_total,
+      started_at: raw.started_at,
+      completed_at: raw.completed_at,
+      error_message: raw.error_message,
+      created_at: raw.created_at,
+      site_name: site?.name ?? 'Unknown',
+      site_url: site?.url ?? '',
+    },
+    error: null,
+  };
+}
+
+// ============================================================================
+// Violation management
+// ============================================================================
+
+export async function insertViolations(
+  violations: ViolationInsert[]
+): Promise<{ error: string | null }> {
+  if (violations.length === 0) return { error: null };
+  const supabase = await createClient();
+  const { error } = await supabase.from('violations').insert(violations);
+  if (error) {
+    return { error: error.message };
+  }
+  return { error: null };
+}
+
+// ============================================================================
+// Scan pages management
+// ============================================================================
+
+export async function insertScanPages(
+  pages: ScanPageInsert[]
+): Promise<{ error: string | null }> {
+  if (pages.length === 0) return { error: null };
+  const supabase = await createClient();
+  const { error } = await supabase.from('scan_pages').insert(pages);
+  if (error) {
+    return { error: error.message };
+  }
+  return { error: null };
+}
+
+export async function getLastScanTime(
+  siteId: string,
+  userId: string
+): Promise<{ data: string | null; error: string | null }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('scans')
+    .select('created_at')
+    .eq('site_id', siteId)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return { data: null, error: null };
+    }
+    return { data: null, error: error.message };
+  }
+  return { data: data.created_at, error: null };
 }
