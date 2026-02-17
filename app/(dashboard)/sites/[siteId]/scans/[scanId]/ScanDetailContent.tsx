@@ -1,9 +1,10 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, FileDown } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { getScan, getViolations, getSite } from '@/lib/supabase/queries';
 import ViolationsList from './ViolationsList';
+import ExportButton from '@/components/reports/ExportButton';
 
 interface ScanDetailContentProps {
   siteId: string;
@@ -71,14 +72,7 @@ export default async function ScanDetailContent({
           </p>
         </div>
 
-        <button
-          disabled
-          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-400 cursor-not-allowed"
-          title="PDF export coming soon"
-        >
-          <FileDown className="h-4 w-4" />
-          Export PDF Report
-        </button>
+        <ExportButton scanId={scanId} />
       </div>
 
       {/* Scan metadata */}

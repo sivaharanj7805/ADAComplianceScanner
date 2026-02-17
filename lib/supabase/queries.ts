@@ -11,6 +11,7 @@ import type {
   Violation,
   ViolationInsert,
   ScanPageInsert,
+  AgencySettings,
 } from '@/lib/types/database';
 
 // ============================================================================
@@ -518,4 +519,27 @@ export async function getLastScanTime(
     return { data: null, error: error.message };
   }
   return { data: data.created_at, error: null };
+}
+
+// ============================================================================
+// Agency settings
+// ============================================================================
+
+export async function getAgencySettings(
+  userId: string
+): Promise<{ data: AgencySettings | null; error: string | null }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('agency_settings')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return { data: null, error: null };
+    }
+    return { data: null, error: error.message };
+  }
+  return { data, error: null };
 }
