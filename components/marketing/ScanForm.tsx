@@ -70,10 +70,16 @@ export default function ScanForm() {
 
         setResult(data as ScanResponse);
         setScannedUrl(scanUrl);
-      } catch {
-        setError(
-          'Unable to reach our scanning service. Please check your connection and try again.'
-        );
+      } catch (err) {
+        if (err instanceof TypeError && err.message === 'Failed to fetch') {
+          setError(
+            'Unable to reach our scanning service. Please check your internet connection and try again.'
+          );
+        } else {
+          setError(
+            'An unexpected error occurred. Please try again.'
+          );
+        }
       } finally {
         clearInterval(statusTimer);
         setScanning(false);

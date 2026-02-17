@@ -51,7 +51,7 @@ function classifyError(err: unknown): { code: ScanErrorCode; message: string } {
     return {
       code: 'DNS_FAILURE',
       message:
-        'The website address could not be found. Please check that the URL is spelled correctly and that the website exists.',
+        "We couldn't reach this website. Please check the URL and make sure it's spelled correctly.",
     };
   }
 
@@ -64,7 +64,7 @@ function classifyError(err: unknown): { code: ScanErrorCode; message: string } {
     return {
       code: 'SSL_ERROR',
       message:
-        "The website's security certificate has a problem. The site may have an expired or invalid SSL certificate. Please verify the URL uses the correct protocol (http:// or https://).",
+        "There's an SSL certificate issue with this site. The certificate may be expired or invalid. Try using http:// instead of https://.",
     };
   }
 
@@ -75,7 +75,7 @@ function classifyError(err: unknown): { code: ScanErrorCode; message: string } {
     return {
       code: 'CONNECTION_REFUSED',
       message:
-        'The website refused the connection. The server may be down or blocking automated scans. Please try again later.',
+        "We couldn't reach this website. The server may be down or blocking automated scans. Please try again later.",
     };
   }
 
@@ -88,7 +88,7 @@ function classifyError(err: unknown): { code: ScanErrorCode; message: string } {
     return {
       code: 'TIMEOUT',
       message:
-        'The page took too long to load (over 30 seconds). This could mean the server is slow or the page is very large. Please try again later.',
+        'This page took too long to load. Try again or scan a different page.',
     };
   }
 
@@ -96,7 +96,7 @@ function classifyError(err: unknown): { code: ScanErrorCode; message: string } {
     return {
       code: 'CONNECTION_REFUSED',
       message:
-        'Could not connect to the website. The server may be down or experiencing network issues. Please try again later.',
+        "We couldn't reach this website. The server may be experiencing network issues. Please try again later.",
     };
   }
 
@@ -104,13 +104,13 @@ function classifyError(err: unknown): { code: ScanErrorCode; message: string } {
     return {
       code: 'PAGE_CRASH',
       message:
-        'The page caused the browser to crash during scanning. This usually happens with very large or resource-intensive pages.',
+        'The page caused the browser to crash during scanning. This usually happens with very large or resource-intensive pages. Try scanning a different page.',
     };
   }
 
   return {
     code: 'UNKNOWN',
-    message: `An unexpected error occurred while scanning: ${msg}. Please try again or contact support if the problem persists.`,
+    message: 'An unexpected error occurred while scanning. Please try again or contact support if the problem persists.',
   };
 }
 
@@ -241,13 +241,17 @@ export async function scanPage(url: string): Promise<PageScanOutcome> {
     // Check for HTTP errors
     if (httpStatus && httpStatus >= 400) {
       const statusMessages: Record<number, string> = {
-        401: 'The page requires authentication (login). We can only scan publicly accessible pages.',
-        403: 'The website blocked our scanner from accessing this page. The server returned a 403 Forbidden error.',
-        404: 'This page does not exist. The server returned a 404 Not Found error. Please check the URL.',
-        500: 'The website is experiencing a server error (500). This is a problem on their end. Please try again later.',
-        502: 'The website returned a Bad Gateway error (502). This is usually a temporary server issue.',
-        503: 'The website is temporarily unavailable (503). It may be undergoing maintenance. Please try again later.',
+        401: 'This page requires login. We can only scan publicly accessible pages.',
+        403: 'This page requires login. We can only scan publicly accessible pages.',
+        404: 'This page returned an error (404 Not Found). Make sure the URL is correct.',
+        500: 'This page returned a server error (500). This is a problem on their end. Please try again later.',
+        502: 'This page returned an error (502 Bad Gateway). This is usually a temporary server issue.',
+        503: 'This page returned an error (503 Service Unavailable). It may be undergoing maintenance. Please try again later.',
       };
+
+      const errorCode: ScanErrorCode = (httpStatus === 401 || httpStatus === 403)
+        ? 'AUTH_REQUIRED'
+        : 'HTTP_ERROR';
 
       return {
         success: false,
@@ -255,8 +259,8 @@ export async function scanPage(url: string): Promise<PageScanOutcome> {
           url,
           error:
             statusMessages[httpStatus] ??
-            `The website returned an HTTP ${httpStatus} error. Please check the URL and try again.`,
-          errorCode: 'HTTP_ERROR',
+            `This page returned an error (HTTP ${httpStatus}). Make sure the URL is correct and try again.`,
+          errorCode,
           timestamp: new Date().toISOString(),
         },
       };

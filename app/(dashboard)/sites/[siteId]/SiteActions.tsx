@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Play, Trash2, Loader2 } from 'lucide-react';
 import { triggerScanAction, deleteSiteAction } from '../actions';
+import { useToastContext } from '@/components/ui/ToastProvider';
 
 interface SiteActionsProps {
   siteId: string;
@@ -17,22 +18,37 @@ export default function SiteActions({
   const [deletePending, startDeleteTransition] = useTransition();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToastContext();
 
   function handleScan() {
     setError(null);
     startScanTransition(async () => {
-      const result = await triggerScanAction(siteId);
-      if (result.error) {
-        setError(result.error);
-      } else {
-        router.refresh();
+      try {
+        const result = await triggerScanAction(siteId);
+        if (result.error) {
+          setError(result.error);
+          toast.error(result.error);
+        } else {
+          toast.success('Scan completed successfully.');
+          router.refresh();
+        }
+      } catch {
+        setError('Something went wrong. Please try again.');
+        toast.error('Failed to start scan. Please check your connection.');
       }
     });
   }
 
   function handleDelete() {
     startDeleteTransition(async () => {
-      await deleteSiteAction(siteId);
+      try {
+        const result = await deleteSiteAction(siteId);
+        if (result?.error) {
+          toast.error(result.error);
+        }
+      } catch {
+        // deleteSiteAction redirects on success, so errors here are real failures
+      }
     });
   }
 

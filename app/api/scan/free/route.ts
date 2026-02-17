@@ -82,60 +82,68 @@ interface FreeScanResponse {
 // ============================================================================
 
 export async function POST(request: NextRequest) {
-  // Get client IP for rate limiting
-  const forwarded = request.headers.get('x-forwarded-for');
-  const ip = forwarded?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown';
-
-  if (isRateLimited(ip)) {
-    return NextResponse.json(
-      {
-        error: 'Rate limit exceeded. You can scan up to 10 pages per hour. Please try again later.',
-      },
-      { status: 429 }
-    );
-  }
-
-  // Parse and validate request body
-  let body: unknown;
   try {
-    body = await request.json();
-  } catch {
+    // Get client IP for rate limiting
+    const forwarded = request.headers.get('x-forwarded-for');
+    const ip = forwarded?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown';
+
+    if (isRateLimited(ip)) {
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded. You can scan up to 10 pages per hour. Please try again later.',
+        },
+        { status: 429 }
+      );
+    }
+
+    // Parse and validate request body
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid request body. Please send a JSON object with a "url" field.' },
+        { status: 400 }
+      );
+    }
+
+    const validation = scanRequestSchema.safeParse(body);
+    if (!validation.success) {
+      const message = validation.error.issues[0]?.message || 'Invalid URL';
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+
+    const { url } = validation.data;
+
+    // Run the scan
+    const outcome = await scanPage(url);
+
+    if (!outcome.success) {
+      return NextResponse.json(
+        { error: outcome.error.error },
+        { status: 422 }
+      );
+    }
+
+    const { result } = outcome;
+
+    // Return top 10 violations only (incentivize upgrade for full results)
+    const topViolations = result.violations.slice(0, 10);
+
+    const response: FreeScanResponse = {
+      score: result.score,
+      totalViolations: result.violations.length,
+      violations: topViolations,
+      pageTitle: result.pageTitle,
+      scannedAt: result.timestamp,
+    };
+
+    return NextResponse.json(response);
+  } catch (err) {
+    console.error('[POST /api/scan/free] Unhandled error:', err);
     return NextResponse.json(
-      { error: 'Invalid request body. Please send a JSON object with a "url" field.' },
-      { status: 400 }
+      { error: 'An unexpected error occurred. Please try again later.' },
+      { status: 500 }
     );
   }
-
-  const validation = scanRequestSchema.safeParse(body);
-  if (!validation.success) {
-    const message = validation.error.issues[0]?.message || 'Invalid URL';
-    return NextResponse.json({ error: message }, { status: 400 });
-  }
-
-  const { url } = validation.data;
-
-  // Run the scan
-  const outcome = await scanPage(url);
-
-  if (!outcome.success) {
-    return NextResponse.json(
-      { error: outcome.error.error },
-      { status: 422 }
-    );
-  }
-
-  const { result } = outcome;
-
-  // Return top 10 violations only (incentivize upgrade for full results)
-  const topViolations = result.violations.slice(0, 10);
-
-  const response: FreeScanResponse = {
-    score: result.score,
-    totalViolations: result.violations.length,
-    violations: topViolations,
-    pageTitle: result.pageTitle,
-    scannedAt: result.timestamp,
-  };
-
-  return NextResponse.json(response);
 }

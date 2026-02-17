@@ -4,39 +4,49 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Globe, Loader2, AlertCircle } from 'lucide-react';
 import { createSiteAction, triggerScanAction } from '../actions';
+import { useToastContext } from '@/components/ui/ToastProvider';
 
 export default function AddSiteForm() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const toast = useToastContext();
 
   function handleSubmit(formData: FormData) {
     setError(null);
     setStatus('Creating site...');
 
     startTransition(async () => {
-      const result = await createSiteAction(formData);
+      try {
+        const result = await createSiteAction(formData);
 
-      if (result.error) {
-        setError(result.error);
-        setStatus(null);
-        return;
-      }
-
-      if (result.siteId) {
-        setStatus('Site created! Starting initial scan...');
-
-        // Trigger initial scan
-        const scanResult = await triggerScanAction(result.siteId);
-
-        if (scanResult.error) {
-          // Site was created but scan failed — still redirect
-          router.push(`/dashboard/sites/${result.siteId}`);
+        if (result.error) {
+          setError(result.error);
+          setStatus(null);
+          toast.error(result.error);
           return;
         }
 
-        router.push(`/dashboard/sites/${result.siteId}`);
+        if (result.siteId) {
+          setStatus('Site created! Starting initial scan...');
+          toast.success('Site added successfully.');
+
+          // Trigger initial scan
+          const scanResult = await triggerScanAction(result.siteId);
+
+          if (scanResult.error) {
+            toast.info('Site created, but the initial scan failed. You can retry from the site page.');
+            router.push(`/dashboard/sites/${result.siteId}`);
+            return;
+          }
+
+          router.push(`/dashboard/sites/${result.siteId}`);
+        }
+      } catch {
+        setError('Something went wrong. Please try again.');
+        setStatus(null);
+        toast.error('Failed to add site. Please check your connection.');
       }
     });
   }
