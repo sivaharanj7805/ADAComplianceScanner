@@ -1,0 +1,23 @@
+{
+  "name": "accessaudit-scan-worker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "axe-core": "^4.11.1",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "puppeteer": "^24.37.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.18",
+    "@types/express": "^5.0.2",
+    "@types/node": "^20.19.33",
+    "tsx": "^4.19.4",
+    "typescript": "^5"
+  }
+}
