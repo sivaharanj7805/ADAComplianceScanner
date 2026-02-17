@@ -18,14 +18,23 @@ import {
 import ScanForm from '@/components/marketing/ScanForm';
 
 export const metadata: Metadata = {
-  title: 'ADA Title II Compliance for Municipalities | AccessAudit',
+  title: 'Municipal Website ADA Compliance | Title II Deadline Scanner',
   description:
-    'Is your town website ready for the ADA Title II deadline? April 2026 for municipalities over 50,000. Automated scanning with reports your council can understand.',
+    'Is your municipal website ready for the ADA Title II deadline? April 2026 for cities over 50,000. Automated WCAG 2.1 AA scanning with reports your council can understand. Plans from $79/month.',
   openGraph: {
-    title:
-      'ADA Title II Deadline Is Coming — Is Your Municipality Ready? | AccessAudit',
+    title: 'Municipal Website ADA Compliance | Title II Deadline Scanner',
     description:
-      'Automated WCAG 2.1 AA scanning with plain-English reports for municipal websites. $79/month.',
+      'Automated WCAG 2.1 AA scanning with plain-English reports for municipal websites. Title II deadline approaching — start scanning today.',
+    url: 'https://www.accessaudit.com/municipalities',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Municipal Website ADA Compliance | Title II Deadline Scanner',
+    description:
+      'Is your town website ready for the ADA Title II deadline? Automated scanning with plain-English reports. $79/month.',
+  },
+  alternates: {
+    canonical: 'https://www.accessaudit.com/municipalities',
   },
 };
 

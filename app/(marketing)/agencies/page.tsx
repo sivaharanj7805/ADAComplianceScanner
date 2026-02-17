@@ -15,13 +15,23 @@ import {
 } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'ADA Compliance for Agencies | AccessAudit',
+  title: 'ADA Compliance Monitoring for Web Agencies | White-Label Reports',
   description:
-    'Monitor accessibility across all your client sites from one dashboard. White-labeled reports, per-portfolio pricing. Start your free trial.',
+    'Monitor ADA/WCAG accessibility across all your client sites from one dashboard. White-labeled PDF reports, per-portfolio pricing. Start your free 14-day trial.',
   openGraph: {
-    title: 'ADA Compliance Monitoring for Agencies | AccessAudit',
+    title: 'ADA Compliance Monitoring for Web Agencies | AccessAudit',
     description:
-      'One dashboard for every client. White-labeled PDF reports. Per-portfolio pricing, not per-domain.',
+      'One dashboard for every client. White-labeled PDF reports. Per-portfolio pricing, not per-domain. Free 14-day trial.',
+    url: 'https://www.accessaudit.com/agencies',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'ADA Compliance Monitoring for Web Agencies | White-Label Reports',
+    description:
+      'Monitor accessibility across all client sites. White-labeled reports, per-portfolio pricing.',
+  },
+  alternates: {
+    canonical: 'https://www.accessaudit.com/agencies',
   },
 };
 

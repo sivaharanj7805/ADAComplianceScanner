@@ -20,14 +20,101 @@ import {
 import ScanForm from '@/components/marketing/ScanForm';
 
 export const metadata: Metadata = {
-  title: 'AccessAudit | ADA Compliance Scanner & Monitoring',
+  title: 'AccessAudit — ADA Website Compliance Scanner & Monitoring',
   description:
-    'Stop ADA lawsuits before they start. Automated WCAG 2.1 AA compliance scanning with plain-English reports, ongoing monitoring, and compliance scoring.',
+    'Find and fix ADA/WCAG accessibility violations on your website. Free scan, plain-English reports, automated monitoring. Plans from $79/month.',
   openGraph: {
-    title: 'AccessAudit | Stop ADA Lawsuits Before They Start',
+    title: 'AccessAudit — Stop ADA Lawsuits Before They Start',
     description:
-      'Automated ADA compliance scanning with plain-English reports. Free scan, no signup required.',
+      'Scan your website for WCAG 2.1 AA violations. Get plain-English reports with actionable fixes. Free scan, no signup required.',
+    url: 'https://www.accessaudit.com',
   },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'AccessAudit — ADA Website Compliance Scanner & Monitoring',
+    description:
+      'Find and fix ADA/WCAG accessibility violations on your website. Free scan, plain-English reports, automated monitoring.',
+  },
+  alternates: {
+    canonical: 'https://www.accessaudit.com',
+  },
+};
+
+const organizationJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'AccessAudit',
+  url: 'https://www.accessaudit.com',
+  logo: 'https://www.accessaudit.com/logo.png',
+  description:
+    'ADA and WCAG 2.1 AA compliance scanning with plain-English reports, automated monitoring, and compliance scoring.',
+  sameAs: [],
+};
+
+const softwareJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'AccessAudit',
+  applicationCategory: 'WebApplication',
+  operatingSystem: 'Web',
+  url: 'https://www.accessaudit.com',
+  description:
+    'Automated ADA/WCAG website compliance scanner with plain-English violation reports, ongoing monitoring, and compliance scoring.',
+  offers: {
+    '@type': 'AggregateOffer',
+    priceCurrency: 'USD',
+    lowPrice: '79',
+    highPrice: '199',
+    offerCount: '3',
+  },
+  featureList: [
+    'WCAG 2.1 AA compliance scanning',
+    'Plain-English violation reports',
+    'Automated weekly monitoring',
+    'Compliance scoring (0-100)',
+    'PDF report generation',
+    'Accessibility statement generator',
+    'White-label reports for agencies',
+  ],
+};
+
+const faqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'What is ADA web compliance?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'The Americans with Disabilities Act (ADA) requires businesses to make their websites accessible to people with disabilities. Courts consistently reference WCAG 2.1 Level AA as the technical benchmark for compliance.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How much does an ADA website lawsuit cost?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'ADA web accessibility lawsuits typically settle for $5,000 to $150,000+. Over 5,100 ADA web lawsuits were filed in 2025 alone, with 69% targeting e-commerce websites.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How does AccessAudit scan for accessibility violations?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'AccessAudit uses axe-core, the industry-standard accessibility testing engine trusted by Microsoft, Google, and the US government. It loads your page in a real browser and checks against WCAG 2.1 Level AA criteria.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'What are accessibility overlay widgets and do they work?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Accessibility overlays are JavaScript widgets that claim to fix compliance issues automatically. However, they do not fix underlying code violations, courts do not accept them as compliance, and the FTC fined the largest overlay provider $1M for deceptive practices.',
+      },
+    },
+  ],
 };
 
 const features = [
@@ -93,6 +180,19 @@ const audienceCards = [
 export default function HomePage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
+
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-gray-50 to-white" />
