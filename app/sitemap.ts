@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
 
-const SITE_URL = 'https://www.accessaudit.com';
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.accessaudit.com';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [

@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const SITE_URL = 'https://www.accessaudit.com';
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.accessaudit.com';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

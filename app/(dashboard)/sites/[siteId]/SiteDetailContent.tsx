@@ -7,9 +7,16 @@ import {
   FileText,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
-import { getSite, getScans } from '@/lib/supabase/queries';
-import ScoreHistoryChart from './ScoreHistoryChart';
-import ViolationBreakdownChart from './ViolationBreakdownChart';
+import {
+  getSite,
+  getScans,
+  getScoreHistory,
+  getViolationTrend,
+} from '@/lib/supabase/queries';
+import ScoreHistoryChart from '@/components/dashboard/charts/ScoreHistoryChart';
+import ViolationSeverityChart from '@/components/dashboard/charts/ViolationSeverityChart';
+import ViolationTrendChart from '@/components/dashboard/charts/ViolationTrendChart';
+import PagesScanChart from '@/components/dashboard/charts/PagesScanChart';
 import SiteActions from './SiteActions';
 
 interface SiteDetailContentProps {
@@ -35,10 +42,13 @@ export default async function SiteDetailContent({
   siteId,
   userId,
 }: SiteDetailContentProps) {
-  const [siteResult, scansResult] = await Promise.all([
-    getSite(siteId, userId),
-    getScans(siteId, userId, 50),
-  ]);
+  const [siteResult, scansResult, scoreHistoryResult, violationTrendResult] =
+    await Promise.all([
+      getSite(siteId, userId),
+      getScans(siteId, userId, 50),
+      getScoreHistory(siteId, userId, 90),
+      getViolationTrend(siteId, userId, 90),
+    ]);
 
   if (!siteResult.data) {
     notFound();
@@ -52,33 +62,35 @@ export default async function SiteDetailContent({
   const site = siteResult.data;
   const scans = scansResult.data;
   const completedScans = scans.filter((s) => s.status === 'completed');
+  const scoreHistory = scoreHistoryResult.data;
+  const violationTrend = violationTrendResult.data;
 
-  // Prepare chart data (score history)
-  const scoreHistory = completedScans
-    .slice()
-    .reverse()
-    .map((s) => ({
-      date: format(new Date(s.created_at), 'MMM d'),
-      score: s.score ?? 0,
-      violations: s.total_violations,
-    }));
-
-  // Latest scan violation breakdown
+  // Latest scan violation breakdown (for donut chart)
   const latestScan = completedScans[0];
   const violationBreakdown = latestScan
     ? [
-        { name: 'Critical', value: latestScan.critical_count, color: '#EF4444' },
-        { name: 'Serious', value: latestScan.serious_count, color: '#F97316' },
-        { name: 'Moderate', value: latestScan.moderate_count, color: '#EAB308' },
-        { name: 'Minor', value: latestScan.minor_count, color: '#3B82F6' },
-      ].filter((d) => d.value > 0)
+      { name: 'Critical', value: latestScan.critical_count, color: '#EF4444' },
+      { name: 'Serious', value: latestScan.serious_count, color: '#F97316' },
+      { name: 'Moderate', value: latestScan.moderate_count, color: '#EAB308' },
+      { name: 'Minor', value: latestScan.minor_count, color: '#3B82F6' },
+    ].filter((d) => d.value > 0)
     : [];
+
+  // Pages scanned per scan (for bar chart)
+  const pagesScanData = completedScans
+    .slice()
+    .reverse()
+    .map((s) => ({
+      date: s.created_at,
+      pagesScanned: s.pages_scanned,
+      pagesFailed: s.pages_total - s.pages_scanned,
+    }));
 
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
       <Link
-        href="/dashboard/sites"
+        href="/sites"
         className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -129,7 +141,7 @@ export default async function SiteDetailContent({
 
         <div className="flex items-center gap-2">
           <Link
-            href={`/dashboard/sites/${siteId}/statement`}
+            href={`/sites/${siteId}/statement`}
             className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
           >
             <FileText className="h-4 w-4" />
@@ -156,9 +168,8 @@ export default async function SiteDetailContent({
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-medium text-gray-500">Critical</p>
           <p
-            className={`mt-1 text-2xl font-bold ${
-              site.critical_violations > 0 ? 'text-red-600' : 'text-gray-900'
-            }`}
+            className={`mt-1 text-2xl font-bold ${site.critical_violations > 0 ? 'text-red-600' : 'text-gray-900'
+              }`}
           >
             {site.critical_violations}
           </p>
@@ -171,22 +182,53 @@ export default async function SiteDetailContent({
         </div>
       </div>
 
-      {/* Charts section */}
-      {scoreHistory.length > 1 && (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-base font-semibold text-gray-900">
-            Score History
-          </h2>
-          <ScoreHistoryChart data={scoreHistory} />
+      {/* Charts section — 2-column grid */}
+      {(scoreHistory.length > 1 || violationBreakdown.length > 0) && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* Score History */}
+          {scoreHistory.length > 1 && (
+            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+              <h2 className="mb-4 text-base font-semibold text-gray-900">
+                Score History
+              </h2>
+              <ScoreHistoryChart data={scoreHistory} />
+            </div>
+          )}
+
+          {/* Violations by Severity (donut) */}
+          {violationBreakdown.length > 0 && (
+            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+              <h2 className="mb-4 text-base font-semibold text-gray-900">
+                Violations by Severity
+              </h2>
+              <ViolationSeverityChart data={violationBreakdown} />
+            </div>
+          )}
         </div>
       )}
 
-      {violationBreakdown.length > 0 && (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-base font-semibold text-gray-900">
-            Violations by Severity
-          </h2>
-          <ViolationBreakdownChart data={violationBreakdown} />
+      {/* Violation trend + Pages scanned — 2-column grid */}
+      {(violationTrend.length > 1 || pagesScanData.length > 1) && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* Violation Trend (stacked area) */}
+          {violationTrend.length > 1 && (
+            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+              <h2 className="mb-4 text-base font-semibold text-gray-900">
+                Violations Trend
+              </h2>
+              <ViolationTrendChart data={violationTrend} />
+            </div>
+          )}
+
+          {/* Pages Scanned (bar chart) */}
+          {pagesScanData.length > 1 && (
+            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+              <h2 className="mb-4 text-base font-semibold text-gray-900">
+                Pages Scanned per Scan
+              </h2>
+              <PagesScanChart data={pagesScanData} />
+            </div>
+          )}
         </div>
       )}
 
@@ -264,15 +306,14 @@ export default async function SiteDetailContent({
                     </td>
                     <td className="px-5 py-3">
                       <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          scan.status === 'completed'
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${scan.status === 'completed'
                             ? 'bg-emerald-50 text-emerald-700'
                             : scan.status === 'failed'
                               ? 'bg-red-50 text-red-700'
                               : scan.status === 'running'
                                 ? 'bg-blue-50 text-blue-700'
                                 : 'bg-gray-100 text-gray-600'
-                        }`}
+                          }`}
                       >
                         {scan.status}
                       </span>
@@ -280,7 +321,7 @@ export default async function SiteDetailContent({
                     <td className="px-5 py-3 text-right">
                       {scan.status === 'completed' && (
                         <Link
-                          href={`/dashboard/sites/${siteId}/scans/${scan.id}`}
+                          href={`/sites/${siteId}/scans/${scan.id}`}
                           className="text-xs font-medium text-orange-600 hover:text-orange-700"
                         >
                           View Details

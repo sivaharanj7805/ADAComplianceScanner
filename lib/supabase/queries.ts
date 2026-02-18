@@ -268,9 +268,9 @@ export async function getDashboardStats(
   const averageScore =
     sitesWithScores.length > 0
       ? Math.round(
-          sitesWithScores.reduce((sum: number, s: SiteStats) => sum + (s.current_score ?? 0), 0) /
-            sitesWithScores.length
-        )
+        sitesWithScores.reduce((sum: number, s: SiteStats) => sum + (s.current_score ?? 0), 0) /
+        sitesWithScores.length
+      )
       : null;
   const totalViolations = sitesList.reduce(
     (sum: number, s: SiteStats) => sum + s.total_violations,
@@ -584,4 +584,152 @@ export async function upsertAgencySettings(
     return { data: null, error: error.message };
   }
   return { data, error: null };
+}
+
+// ============================================================================
+// Chart data queries
+// ============================================================================
+
+export type ScoreHistoryPoint = { date: string; score: number };
+
+/**
+ * Returns score history for a single site — one data point per completed scan.
+ * Results are sorted oldest-first for charting.
+ */
+export async function getScoreHistory(
+  siteId: string,
+  userId: string,
+  days = 90
+): Promise<{ data: ScoreHistoryPoint[]; error: string | null }> {
+  const supabase = await createClient();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+
+  const { data, error } = await supabase
+    .from('scans')
+    .select('created_at, score')
+    .eq('site_id', siteId)
+    .eq('user_id', userId)
+    .eq('status', 'completed')
+    .not('score', 'is', null)
+    .gte('created_at', cutoff.toISOString())
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    return { data: [], error: error.message };
+  }
+
+  const points: ScoreHistoryPoint[] = (data ?? []).map((s: { created_at: string; score: number | null }) => ({
+    date: s.created_at,
+    score: s.score as number,
+  }));
+  return { data: points, error: null };
+}
+
+export type ViolationTrendPoint = {
+  date: string;
+  critical: number;
+  serious: number;
+  moderate: number;
+  minor: number;
+  total: number;
+};
+
+/**
+ * Returns violation severity counts per completed scan — one data point per scan.
+ * Results are sorted oldest-first for charting.
+ */
+export async function getViolationTrend(
+  siteId: string,
+  userId: string,
+  days = 90
+): Promise<{ data: ViolationTrendPoint[]; error: string | null }> {
+  const supabase = await createClient();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+
+  const { data, error } = await supabase
+    .from('scans')
+    .select('created_at, critical_count, serious_count, moderate_count, minor_count, total_violations')
+    .eq('site_id', siteId)
+    .eq('user_id', userId)
+    .eq('status', 'completed')
+    .gte('created_at', cutoff.toISOString())
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    return { data: [], error: error.message };
+  }
+
+  const points: ViolationTrendPoint[] = (data ?? []).map((s: {
+    created_at: string;
+    critical_count: number;
+    serious_count: number;
+    moderate_count: number;
+    minor_count: number;
+    total_violations: number;
+  }) => ({
+    date: s.created_at,
+    critical: s.critical_count,
+    serious: s.serious_count,
+    moderate: s.moderate_count,
+    minor: s.minor_count,
+    total: s.total_violations,
+  }));
+  return { data: points, error: null };
+}
+
+export type OverviewScorePoint = { date: string; avgScore: number; totalViolations: number };
+
+/**
+ * Returns an average-score timeline across ALL of a user's sites.
+ * Each data point is the average of the most recent completed scan per site
+ * at a given point in time.
+ */
+export async function getOverviewScoreHistory(
+  userId: string,
+  days = 30
+): Promise<{ data: OverviewScorePoint[]; error: string | null }> {
+  const supabase = await createClient();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+
+  // Fetch all completed scans for the user within the window
+  const { data, error } = await supabase
+    .from('scans')
+    .select('created_at, score, total_violations')
+    .eq('user_id', userId)
+    .eq('status', 'completed')
+    .not('score', 'is', null)
+    .gte('created_at', cutoff.toISOString())
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    return { data: [], error: error.message };
+  }
+
+  if (!data || data.length === 0) {
+    return { data: [], error: null };
+  }
+
+  // Group scans by date (YYYY-MM-DD) and average the scores
+  const byDate = new Map<string, { scores: number[]; violations: number }>();
+  for (const scan of data) {
+    const dateKey = scan.created_at.substring(0, 10);
+    const entry = byDate.get(dateKey) ?? { scores: [], violations: 0 };
+    entry.scores.push(scan.score as number);
+    entry.violations += scan.total_violations;
+    byDate.set(dateKey, entry);
+  }
+
+  const points: OverviewScorePoint[] = [];
+  for (const [date, { scores, violations }] of byDate) {
+    points.push({
+      date,
+      avgScore: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
+      totalViolations: violations,
+    });
+  }
+
+  return { data: points, error: null };
 }

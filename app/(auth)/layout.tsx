@@ -1,6 +1,10 @@
 import Link from 'next/link';
 import { Shield, CheckCircle, BarChart3 } from 'lucide-react';
 
+// Auth pages depend on Supabase server client at action-invocation time;
+// skip static prerendering so the build doesn't need runtime secrets.
+export const dynamic = 'force-dynamic';
+
 export default function AuthLayout({
   children,
 }: {

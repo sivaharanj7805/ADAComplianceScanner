@@ -1,4 +1,4 @@
-import { resend, EMAIL_FROM, APP_URL } from './client';
+import { getResend, EMAIL_FROM, APP_URL } from './client';
 import { WelcomeEmail } from './templates/welcome';
 import { ScanCompleteEmail } from './templates/scan-complete';
 import { NewViolationsEmail } from './templates/new-violations';
@@ -34,7 +34,7 @@ export async function sendWelcomeEmail(
   user: Pick<Profile, 'email' | 'full_name'>
 ): Promise<EmailResult> {
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: EMAIL_FROM,
       to: user.email,
       subject: 'Welcome to AccessAudit',
@@ -80,7 +80,7 @@ export async function sendScanCompleteEmail(
       description: v.description,
     }));
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: EMAIL_FROM,
       to: user.email,
       subject: `Scan Complete: ${site.name} scored ${scan.score ?? 0}/100`,
@@ -129,7 +129,7 @@ export async function sendNewViolationsEmail(
       pageUrl: v.page_url,
     }));
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: EMAIL_FROM,
       to: user.email,
       subject: `New Violations Detected on ${site.name}`,
@@ -166,7 +166,7 @@ export async function sendScoreImprovedEmail(
   newScore: number
 ): Promise<EmailResult> {
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: EMAIL_FROM,
       to: user.email,
       subject: `Your Compliance Score Improved! ${site.name}: ${oldScore} → ${newScore}`,
@@ -204,7 +204,7 @@ export async function sendWeeklyDigest(
   weekEnd: string
 ): Promise<EmailResult> {
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: EMAIL_FROM,
       to: user.email,
       subject: `Your Weekly Accessibility Report (${weekStart} — ${weekEnd})`,
@@ -241,7 +241,7 @@ export async function sendTrialEndingEmail(
   averageScore: number | null
 ): Promise<EmailResult> {
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: EMAIL_FROM,
       to: user.email,
       subject: `Your Trial Ends in ${daysLeft} Day${daysLeft !== 1 ? 's' : ''}`,

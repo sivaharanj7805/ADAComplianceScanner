@@ -12,10 +12,12 @@ import {
   getDashboardStats,
   getRecentScans,
   getProfile,
+  getOverviewScoreHistory,
 } from '@/lib/supabase/queries';
 import StatCard from '@/components/dashboard/StatCard';
 import SiteCard from '@/components/dashboard/SiteCard';
 import EmptyState from '@/components/dashboard/EmptyState';
+import DashboardCharts from './DashboardCharts';
 import { formatDistanceToNow } from 'date-fns';
 
 interface DashboardOverviewProps {
@@ -34,12 +36,13 @@ export default async function DashboardOverview({
   userId,
   greeting,
 }: DashboardOverviewProps) {
-  const [profileResult, statsResult, sitesResult, recentScansResult] =
+  const [profileResult, statsResult, sitesResult, recentScansResult, overviewScoreResult] =
     await Promise.all([
       getProfile(userId),
       getDashboardStats(userId),
       getSites(userId),
       getRecentScans(userId, 5),
+      getOverviewScoreHistory(userId, 30),
     ]);
 
   // Propagate critical errors to the error boundary
@@ -55,6 +58,7 @@ export default async function DashboardOverview({
   const stats = statsResult.data;
   const sites = sitesResult.data;
   const recentScans = recentScansResult.data;
+  const overviewScoreHistory = overviewScoreResult.data;
 
   const displayName = profile?.full_name?.split(' ')[0] ?? 'there';
 
@@ -100,6 +104,14 @@ export default async function DashboardOverview({
         />
       </div>
 
+      {/* Overview charts */}
+      {sites.length > 0 && (
+        <DashboardCharts
+          sites={sites}
+          overviewScoreHistory={overviewScoreHistory}
+        />
+      )}
+
       {/* Sites section */}
       <div>
         <div className="mb-4 flex items-center justify-between">
@@ -137,13 +149,12 @@ export default async function DashboardOverview({
                 >
                   {/* Status icon */}
                   <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                      scan.status === 'completed'
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${scan.status === 'completed'
                         ? 'bg-emerald-50'
                         : scan.status === 'failed'
                           ? 'bg-red-50'
                           : 'bg-gray-100'
-                    }`}
+                      }`}
                   >
                     {scan.status === 'completed' ? (
                       <CheckCircle className="h-4.5 w-4.5 text-emerald-600" />
@@ -177,13 +188,12 @@ export default async function DashboardOverview({
                   {/* Score badge (if completed) */}
                   {scan.status === 'completed' && scan.score !== null && (
                     <div
-                      className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold ${
-                        scan.score >= 80
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold ${scan.score >= 80
                           ? 'bg-emerald-50 text-emerald-600'
                           : scan.score >= 50
                             ? 'bg-amber-50 text-amber-600'
                             : 'bg-red-50 text-red-600'
-                      }`}
+                        }`}
                     >
                       {scan.score}
                     </div>
