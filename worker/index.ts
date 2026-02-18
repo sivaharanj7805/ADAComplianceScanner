@@ -12,8 +12,20 @@ const API_KEY = process.env.API_KEY;
 // Middleware
 // ============================================================================
 
-app.use(cors());
-app.use(express.json());
+// Restrict CORS to the main application origin in production.
+// Falls back to allowing all origins in development.
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+  : undefined;
+
+app.use(
+  cors(
+    ALLOWED_ORIGINS
+      ? { origin: ALLOWED_ORIGINS, methods: ['GET', 'POST'] }
+      : undefined
+  )
+);
+app.use(express.json({ limit: '1mb' }));
 
 /**
  * API key authentication middleware.

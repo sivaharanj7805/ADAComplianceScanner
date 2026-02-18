@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getScanByShareToken } from '@/lib/supabase/queries';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { generateComplianceReport } from '@/lib/reports/generate-pdf';
 
 export async function GET(
@@ -31,7 +31,8 @@ export async function GET(
     const { scan, violations, siteName, siteUrl, agencySettings } = data;
 
     // Fetch the scan owner's profile for the PDF report template
-    const supabase = await createClient();
+    // Use admin client since this endpoint is unauthenticated (share token is the auth)
+    const supabase = createAdminClient();
     const { data: profile } = await supabase
       .from('profiles')
       .select('*')
