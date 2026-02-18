@@ -29,7 +29,7 @@ export default function ShareReportButton({
   const isShared = shareToken !== null;
 
   const shareUrl = shareToken
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/shared/report/${shareToken}`
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/report/${shareToken}`
     : null;
 
   const handleToggle = useCallback(async () => {

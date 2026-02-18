@@ -11,6 +11,8 @@ import {
   Globe,
   Code,
   Wrench,
+  FileDown,
+  Loader2,
 } from 'lucide-react';
 import type { Scan, Violation, ViolationSeverity } from '@/lib/types/database';
 
@@ -19,6 +21,8 @@ interface SharedReportContentProps {
   violations: Violation[];
   siteName: string;
   siteUrl: string;
+  shareToken: string;
+  primaryColor: string;
 }
 
 const SEVERITY_ORDER: ViolationSeverity[] = [
@@ -30,13 +34,14 @@ const SEVERITY_ORDER: ViolationSeverity[] = [
 
 const SEVERITY_CONFIG: Record<
   ViolationSeverity,
-  { label: string; color: string; bg: string; border: string; icon: typeof AlertOctagon }
+  { label: string; color: string; bg: string; border: string; dot: string; icon: typeof AlertOctagon }
 > = {
   critical: {
     label: 'Critical',
     color: 'text-red-700',
     bg: 'bg-red-50',
     border: 'border-red-200',
+    dot: 'bg-red-500',
     icon: AlertOctagon,
   },
   serious: {
@@ -44,6 +49,7 @@ const SEVERITY_CONFIG: Record<
     color: 'text-orange-700',
     bg: 'bg-orange-50',
     border: 'border-orange-200',
+    dot: 'bg-orange-500',
     icon: ShieldAlert,
   },
   moderate: {
@@ -51,6 +57,7 @@ const SEVERITY_CONFIG: Record<
     color: 'text-amber-700',
     bg: 'bg-amber-50',
     border: 'border-amber-200',
+    dot: 'bg-amber-500',
     icon: AlertTriangle,
   },
   minor: {
@@ -58,6 +65,7 @@ const SEVERITY_CONFIG: Record<
     color: 'text-blue-700',
     bg: 'bg-blue-50',
     border: 'border-blue-200',
+    dot: 'bg-blue-500',
     icon: Info,
   },
 };
@@ -70,7 +78,7 @@ function getScoreColor(score: number | null): string {
 }
 
 function getScoreBg(score: number | null): string {
-  if (score === null) return 'bg-gray-100';
+  if (score === null) return 'bg-gray-100 border-gray-200';
   if (score >= 80) return 'bg-emerald-50 border-emerald-200';
   if (score >= 50) return 'bg-amber-50 border-amber-200';
   return 'bg-red-50 border-red-200';
@@ -80,9 +88,12 @@ export default function SharedReportContent({
   scan,
   violations,
   siteUrl,
+  shareToken,
+  primaryColor,
 }: SharedReportContentProps) {
   const [severityFilter, setSeverityFilter] = useState<ViolationSeverity | 'all'>('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const filtered = useMemo(() => {
     let result = violations;
@@ -107,18 +118,64 @@ export default function SharedReportContent({
     });
   }
 
+  async function handleDownloadPdf() {
+    setPdfLoading(true);
+    try {
+      const response = await fetch(`/api/reports/shared/${shareToken}`);
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
+      }
+      const disposition = response.headers.get('Content-Disposition');
+      const filenameMatch = disposition?.match(/filename="(.+)"/);
+      const filename = filenameMatch?.[1] ?? 'compliance-report.pdf';
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      // Silent fail — the button shows loading state
+    } finally {
+      setPdfLoading(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
-      {/* Score hero */}
-      <div className={`rounded-xl border p-6 text-center ${getScoreBg(scan.score)}`}>
+      {/* Score hero + Download PDF */}
+      <div className={`relative rounded-xl border p-6 text-center ${getScoreBg(scan.score)}`}>
         <p className="text-sm font-medium text-gray-500">Compliance Score</p>
         <p className={`mt-1 text-5xl font-bold ${getScoreColor(scan.score)}`}>
           {scan.score ?? '—'}
           <span className="text-lg text-gray-400">/100</span>
         </p>
-        <p className="mt-2 text-sm text-gray-500">
-          {siteUrl}
-        </p>
+        <p className="mt-2 text-sm text-gray-500">{siteUrl}</p>
+
+        {/* Download PDF */}
+        <div className="mt-4">
+          <button
+            onClick={handleDownloadPdf}
+            disabled={pdfLoading}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {pdfLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Generating PDF…
+              </>
+            ) : (
+              <>
+                <FileDown className="h-4 w-4" />
+                Download PDF
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Stats grid */}
@@ -166,17 +223,7 @@ export default function SharedReportContent({
               key={severity}
               className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium ${config.bg} ${config.color} ${config.border}`}
             >
-              <div
-                className={`h-2 w-2 rounded-full ${
-                  severity === 'critical'
-                    ? 'bg-red-500'
-                    : severity === 'serious'
-                      ? 'bg-orange-500'
-                      : severity === 'moderate'
-                        ? 'bg-amber-500'
-                        : 'bg-blue-500'
-                }`}
-              />
+              <div className={`h-2 w-2 rounded-full ${config.dot}`} />
               {config.label}: {count}
             </div>
           );
@@ -202,7 +249,11 @@ export default function SharedReportContent({
               onChange={(e) =>
                 setSeverityFilter(e.target.value as ViolationSeverity | 'all')
               }
-              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-1"
+              style={{
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                ['--tw-ring-color' as any]: primaryColor,
+              }}
             >
               <option value="all">All Severities</option>
               {SEVERITY_ORDER.map((s) => (
@@ -311,7 +362,8 @@ export default function SharedReportContent({
                           href={v.page_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm text-orange-600 hover:text-orange-700 break-all"
+                          className="text-sm break-all hover:underline"
+                          style={{ color: primaryColor }}
                         >
                           {v.page_url}
                         </a>

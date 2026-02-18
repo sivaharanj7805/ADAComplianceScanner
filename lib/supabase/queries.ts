@@ -606,6 +606,7 @@ export async function revokeScanShareToken(
 
 /**
  * Fetch a scan and its violations by share token (no auth required).
+ * Also fetches the scan owner's profile and agency settings for white-label.
  * Used for the public shared report page.
  */
 export async function getScanByShareToken(
@@ -616,6 +617,7 @@ export async function getScanByShareToken(
     violations: Violation[];
     siteName: string;
     siteUrl: string;
+    agencySettings: AgencySettings | null;
   } | null;
   error: string | null;
 }> {
@@ -639,14 +641,22 @@ export async function getScanByShareToken(
   const raw = scan as any;
   const site = raw.sites as { name: string; url: string } | null;
 
-  const { data: violations, error: violationsError } = await supabase
-    .from('violations')
-    .select('*')
-    .eq('scan_id', raw.id)
-    .order('severity', { ascending: true });
+  // Fetch violations and agency settings in parallel
+  const [violationsResult, agencyResult] = await Promise.all([
+    supabase
+      .from('violations')
+      .select('*')
+      .eq('scan_id', raw.id)
+      .order('severity', { ascending: true }),
+    supabase
+      .from('agency_settings')
+      .select('*')
+      .eq('user_id', raw.user_id)
+      .maybeSingle(),
+  ]);
 
-  if (violationsError) {
-    return { data: null, error: violationsError.message };
+  if (violationsResult.error) {
+    return { data: null, error: violationsResult.error.message };
   }
 
   return {
@@ -671,9 +681,10 @@ export async function getScanByShareToken(
         error_message: raw.error_message,
         created_at: raw.created_at,
       },
-      violations: violations ?? [],
+      violations: violationsResult.data ?? [],
       siteName: site?.name ?? 'Unknown',
       siteUrl: site?.url ?? '',
+      agencySettings: agencyResult.data ?? null,
     },
     error: null,
   };
