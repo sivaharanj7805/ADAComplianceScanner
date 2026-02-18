@@ -7,6 +7,7 @@ import { compareScans } from '@/lib/scanner/compare';
 import ViolationsList from './ViolationsList';
 import ScanComparisonBanner from '@/components/dashboard/ScanComparison';
 import ExportButton from '@/components/reports/ExportButton';
+import ShareReportButton from '@/components/dashboard/ShareReportButton';
 
 interface ScanDetailContentProps {
   siteId: string;
@@ -97,7 +98,10 @@ export default async function ScanDetailContent({
           </p>
         </div>
 
-        <ExportButton scanId={scanId} />
+        <div className="flex items-center gap-2">
+          <ShareReportButton scanId={scanId} initialShareToken={scan.share_token} />
+          <ExportButton scanId={scanId} />
+        </div>
       </div>
 
       {/* Scan metadata */}

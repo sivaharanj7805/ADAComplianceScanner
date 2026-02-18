@@ -135,6 +135,10 @@ vi.mock('@/lib/supabase/queries', () => ({
   insertScanPages: vi.fn(),
   getAgencySettings: vi.fn(),
   upsertAgencySettings: vi.fn(),
+  getPreviousCompletedScan: vi.fn(),
+  generateScanShareToken: vi.fn(),
+  revokeScanShareToken: vi.fn(),
+  getScanByShareToken: vi.fn(),
 }));
 
 // ============================================================================
@@ -204,6 +208,7 @@ export function createTestScan(overrides: Partial<Scan> = {}): Scan {
     pages_scanned: 3,
     pages_total: 3,
     resolved_count: 0,
+    share_token: null,
     started_at: '2025-01-15T10:00:00Z',
     completed_at: '2025-01-15T10:05:00Z',
     error_message: null,
