@@ -2,8 +2,10 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
-import { getScan, getViolations, getSite } from '@/lib/supabase/queries';
+import { getScan, getViolations, getSite, getPreviousCompletedScan } from '@/lib/supabase/queries';
+import { compareScans } from '@/lib/scanner/compare';
 import ViolationsList from './ViolationsList';
+import ScanComparisonBanner from '@/components/dashboard/ScanComparison';
 import ExportButton from '@/components/reports/ExportButton';
 
 interface ScanDetailContentProps {
@@ -24,10 +26,11 @@ export default async function ScanDetailContent({
   scanId,
   userId,
 }: ScanDetailContentProps) {
-  const [scanResult, violationsResult, siteResult] = await Promise.all([
+  const [scanResult, violationsResult, siteResult, prevScanResult] = await Promise.all([
     getScan(scanId, userId),
     getViolations(scanId, userId),
     getSite(siteId, userId),
+    getPreviousCompletedScan(siteId, scanId, userId),
   ]);
 
   if (!scanResult.data || !siteResult.data) {
@@ -42,6 +45,20 @@ export default async function ScanDetailContent({
   const scan = scanResult.data;
   const violations = violationsResult.data;
   const site = siteResult.data;
+
+  // Build comparison data if a previous scan exists
+  const prevData = prevScanResult.data;
+  const comparison = prevData
+    ? compareScans(prevData.scan, scan, prevData.violations, violations)
+    : null;
+
+  // Build lookup sets for the ViolationsList filters
+  const newViolationIds = comparison
+    ? new Set(comparison.newViolations.map((v) => v.id))
+    : undefined;
+  const persistingViolationIds = comparison
+    ? new Set(comparison.persistingViolations.map((v) => v.id))
+    : undefined;
 
   const duration =
     scan.started_at && scan.completed_at
@@ -121,8 +138,16 @@ export default async function ScanDetailContent({
         <SeverityBadge label="Minor" count={scan.minor_count} color="blue" />
       </div>
 
+      {/* Scan comparison banner */}
+      {comparison && prevData && (
+        <ScanComparisonBanner
+          comparison={comparison}
+          previousScanDate={prevData.scan.created_at}
+        />
+      )}
+
       {/* Violations list with filters */}
-      {violations.length === 0 ? (
+      {violations.length === 0 && (!comparison || comparison.resolvedViolations.length === 0) ? (
         <div className="rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
           <p className="text-lg font-semibold text-emerald-600">
             No violations found!
@@ -136,6 +161,10 @@ export default async function ScanDetailContent({
           violations={violations}
           pageUrls={pageUrls}
           wcagCriteria={wcagCriteria}
+          resolvedViolations={comparison?.resolvedViolations}
+          newViolationIds={newViolationIds}
+          persistingViolationIds={persistingViolationIds}
+          hasComparison={comparison !== null}
         />
       )}
     </div>

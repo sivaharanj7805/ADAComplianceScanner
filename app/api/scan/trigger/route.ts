@@ -13,6 +13,7 @@ import {
   getViolations,
 } from '@/lib/supabase/queries';
 import { remoteScanSite } from '@/lib/scanner/remote-scan';
+import { markNewViolations } from '@/lib/scanner/compare';
 import {
   sendScanCompleteEmail,
   sendNewViolationsEmail,
@@ -181,6 +182,35 @@ export async function POST(request: NextRequest) {
       const overallScore = summary.overallScore;
       const totalViolations = allViolations.length;
 
+      // ── Compare with previous scan ──────────────────────────────────
+      let resolvedCount = 0;
+      try {
+        const supabaseClient = await createClient();
+        const { data: prevScans } = await supabaseClient
+          .from('scans')
+          .select('id')
+          .eq('site_id', siteId)
+          .eq('status', 'completed')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        const prevScanId = prevScans?.[0]?.id;
+        if (prevScanId) {
+          const { data: prevViolations } = await getViolations(prevScanId, user.id);
+          // Mark each violation as new or persisting
+          markNewViolations(allViolations, prevViolations);
+          // Count resolved: violations in previous that aren't in current
+          const currKeys = new Set(
+            allViolations.map((v) => `${v.rule_id}::${v.css_selector ?? ''}::${v.page_url}`)
+          );
+          resolvedCount = prevViolations.filter(
+            (v) => !currKeys.has(`${v.rule_id}::${v.css_selector ?? ''}::${v.page_url}`)
+          ).length;
+        }
+      } catch {
+        // Non-critical — violations will all default to is_new = true
+      }
+
       // Insert violations and scan pages
       await Promise.all([
         insertViolations(allViolations),
@@ -198,6 +228,7 @@ export async function POST(request: NextRequest) {
         minor_count: minorCount,
         pages_scanned: pagesScanned,
         pages_total: summary.totalPages,
+        resolved_count: resolvedCount,
         completed_at: new Date().toISOString(),
       });
 
