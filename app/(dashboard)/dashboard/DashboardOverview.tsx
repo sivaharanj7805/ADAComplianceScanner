@@ -7,7 +7,6 @@ import {
   CheckCircle,
   XCircle,
 } from 'lucide-react';
-import Link from 'next/link';
 import {
   getSites,
   getDashboardStats,
@@ -18,6 +17,7 @@ import {
 import StatCard from '@/components/dashboard/StatCard';
 import SiteCard from '@/components/dashboard/SiteCard';
 import EmptyState from '@/components/dashboard/EmptyState';
+import UpgradeBanner from '@/components/dashboard/UpgradeBanner';
 import DashboardCharts from './DashboardCharts';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -75,20 +75,8 @@ export default async function DashboardOverview({
         </p>
       </div>
 
-      {/* Upgrade banner for free plan users */}
-      {profile?.plan === 'free' && (
-        <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl border border-orange-200 p-4 flex items-center justify-between gap-4">
-          <p className="text-sm text-gray-700">
-            Upgrade to unlock multi-page scanning, automated monitoring, and PDF reports
-          </p>
-          <Link
-            href="/pricing"
-            className="bg-orange-500 text-white rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap hover:bg-orange-600 transition-colors"
-          >
-            Upgrade
-          </Link>
-        </div>
-      )}
+      {/* Upgrade banner for free plan users — opens inline plan modal */}
+      {profile?.plan === 'free' && <UpgradeBanner />}
 
       {/* Stats cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

@@ -11,6 +11,7 @@ import {
 import { createClient } from '@/lib/supabase/server';
 import { getProfile } from '@/lib/supabase/queries';
 import ProfileForm from './ProfileForm';
+import ManageBillingButton from '@/components/dashboard/ManageBillingButton';
 
 export const metadata = {
   title: 'Settings — AccessAudit',
@@ -95,13 +96,7 @@ export default async function SettingsPage() {
                 Status: {profile.subscription_status}
               </p>
             </div>
-            <Link
-              href="/pricing"
-              className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Manage Billing
-              <ChevronRight className="h-4 w-4" />
-            </Link>
+            <ManageBillingButton isFree={profile.plan === 'free'} />
           </div>
         </div>
       </section>

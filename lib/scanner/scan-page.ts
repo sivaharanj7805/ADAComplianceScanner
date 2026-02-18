@@ -1,4 +1,4 @@
-import puppeteer from 'puppeteer';
+import puppeteer, { type Browser } from 'puppeteer';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
@@ -148,47 +148,43 @@ function validateUrl(url: string): { valid: true } | { valid: false; error: Page
 /**
  * Scan a single page for accessibility violations.
  *
- * This function:
- * 1. Launches a headless Chromium browser
- * 2. Navigates to the URL with a 30-second timeout
- * 3. Waits for the page to be fully loaded
- * 4. Injects axe-core
- * 5. Runs axe.run() with WCAG 2.1 AA ruleset
- * 6. Translates results into plain English
- * 7. Calculates a compliance score
- * 8. Returns structured results
+ * When `externalBrowser` is provided the caller owns the browser lifecycle —
+ * scanPage will create a new page on it but will **not** close the browser.
+ * When omitted, scanPage launches (and closes) its own browser instance.
  *
  * Every error type (timeout, DNS, SSL, 404/500, crash) returns a meaningful
  * error message instead of crashing.
  */
-export async function scanPage(url: string): Promise<PageScanOutcome> {
-  // Validate URL first
+export async function scanPage(
+  url: string,
+  externalBrowser?: Browser,
+): Promise<PageScanOutcome> {
   const validation = validateUrl(url);
   if (!validation.valid) {
     return { success: false, error: validation.error };
   }
 
-  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
+  // Track whether we own the browser so we know whether to close it.
+  const ownsTheBrowser = !externalBrowser;
+  let browser: Browser | null = externalBrowser ?? null;
 
   try {
-    // Launch headless Chromium
-    browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--disable-software-rasterizer',
-      ],
-    });
+    if (!browser) {
+      browser = await puppeteer.launch({
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--disable-software-rasterizer',
+        ],
+      });
+    }
 
     const page = await browser.newPage();
 
-    // Set user agent so sites can identify our scanner
     await page.setUserAgent(USER_AGENT);
-
-    // Set a reasonable viewport
     await page.setViewport({ width: 1366, height: 768 });
 
     // Navigate to the URL — try networkidle0 first, fall back to domcontentloaded
@@ -325,7 +321,7 @@ export async function scanPage(url: string): Promise<PageScanOutcome> {
       },
     };
   } finally {
-    if (browser) {
+    if (browser && ownsTheBrowser) {
       try {
         await browser.close();
       } catch {

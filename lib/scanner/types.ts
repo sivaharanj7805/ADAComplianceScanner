@@ -1,4 +1,9 @@
-import type { ViolationSeverity } from '@/lib/types/database';
+// ============================================================================
+// Scanner-local type definitions (no @/ path aliases — this module must be
+// importable from both the Next.js app and the standalone Railway worker)
+// ============================================================================
+
+export type ViolationSeverity = 'critical' | 'serious' | 'moderate' | 'minor';
 
 // ============================================================================
 // axe-core input types (subset of axe-core's own types we actually use)
