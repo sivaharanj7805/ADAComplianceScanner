@@ -327,6 +327,7 @@ export async function getRecentScans(
       pages_scanned: scan.pages_scanned,
       pages_total: scan.pages_total,
       resolved_count: scan.resolved_count ?? 0,
+      share_token: scan.share_token ?? null,
       started_at: scan.started_at,
       completed_at: scan.completed_at,
       error_message: scan.error_message,
@@ -459,6 +460,7 @@ export async function getScan(
       pages_scanned: raw.pages_scanned,
       pages_total: raw.pages_total,
       resolved_count: raw.resolved_count ?? 0,
+      share_token: raw.share_token ?? null,
       started_at: raw.started_at,
       completed_at: raw.completed_at,
       error_message: raw.error_message,
@@ -523,6 +525,169 @@ export async function getLastScanTime(
     return { data: null, error: error.message };
   }
   return { data: data.created_at, error: null };
+}
+
+// ============================================================================
+// Share token management
+// ============================================================================
+
+/**
+ * Generate a cryptographically random 24-character alphanumeric token.
+ */
+function generateShareToken(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => chars[b % chars.length]).join('');
+}
+
+/**
+ * Create or return the existing share token for a scan.
+ * Only the scan owner can generate a token.
+ */
+export async function generateScanShareToken(
+  scanId: string,
+  userId: string
+): Promise<{ data: string | null; error: string | null }> {
+  const supabase = await createClient();
+
+  // Verify ownership and check for existing token
+  const { data: existing, error: fetchError } = await supabase
+    .from('scans')
+    .select('share_token')
+    .eq('id', scanId)
+    .eq('user_id', userId)
+    .single();
+
+  if (fetchError || !existing) {
+    return { data: null, error: fetchError?.message ?? 'Scan not found' };
+  }
+
+  // If a token already exists, return it
+  if (existing.share_token) {
+    return { data: existing.share_token as string, error: null };
+  }
+
+  // Generate and store a new token
+  const token = generateShareToken();
+  const { error: updateError } = await supabase
+    .from('scans')
+    .update({ share_token: token })
+    .eq('id', scanId)
+    .eq('user_id', userId);
+
+  if (updateError) {
+    return { data: null, error: updateError.message };
+  }
+
+  return { data: token, error: null };
+}
+
+/**
+ * Revoke (remove) the share token for a scan, making it private again.
+ */
+export async function revokeScanShareToken(
+  scanId: string,
+  userId: string
+): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('scans')
+    .update({ share_token: null })
+    .eq('id', scanId)
+    .eq('user_id', userId);
+
+  if (error) {
+    return { error: error.message };
+  }
+  return { error: null };
+}
+
+/**
+ * Fetch a scan and its violations by share token (no auth required).
+ * Also fetches the scan owner's profile and agency settings for white-label.
+ * Used for the public shared report page.
+ */
+export async function getScanByShareToken(
+  token: string
+): Promise<{
+  data: {
+    scan: Scan;
+    violations: Violation[];
+    siteName: string;
+    siteUrl: string;
+    agencySettings: AgencySettings | null;
+  } | null;
+  error: string | null;
+}> {
+  const supabase = await createClient();
+
+  const { data: scan, error: scanError } = await supabase
+    .from('scans')
+    .select('*, sites(name, url)')
+    .eq('share_token', token)
+    .eq('status', 'completed')
+    .single();
+
+  if (scanError || !scan) {
+    if (scanError?.code === 'PGRST116') {
+      return { data: null, error: null };
+    }
+    return { data: null, error: scanError?.message ?? 'Scan not found' };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw = scan as any;
+  const site = raw.sites as { name: string; url: string } | null;
+
+  // Fetch violations and agency settings in parallel
+  const [violationsResult, agencyResult] = await Promise.all([
+    supabase
+      .from('violations')
+      .select('*')
+      .eq('scan_id', raw.id)
+      .order('severity', { ascending: true }),
+    supabase
+      .from('agency_settings')
+      .select('*')
+      .eq('user_id', raw.user_id)
+      .maybeSingle(),
+  ]);
+
+  if (violationsResult.error) {
+    return { data: null, error: violationsResult.error.message };
+  }
+
+  return {
+    data: {
+      scan: {
+        id: raw.id,
+        site_id: raw.site_id,
+        user_id: raw.user_id,
+        status: raw.status,
+        score: raw.score,
+        total_violations: raw.total_violations,
+        critical_count: raw.critical_count,
+        serious_count: raw.serious_count,
+        moderate_count: raw.moderate_count,
+        minor_count: raw.minor_count,
+        pages_scanned: raw.pages_scanned,
+        pages_total: raw.pages_total,
+        resolved_count: raw.resolved_count ?? 0,
+        share_token: raw.share_token ?? null,
+        started_at: raw.started_at,
+        completed_at: raw.completed_at,
+        error_message: raw.error_message,
+        created_at: raw.created_at,
+      },
+      violations: violationsResult.data ?? [],
+      siteName: site?.name ?? 'Unknown',
+      siteUrl: site?.url ?? '',
+      agencySettings: agencyResult.data ?? null,
+    },
+    error: null,
+  };
 }
 
 // ============================================================================

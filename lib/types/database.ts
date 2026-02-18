@@ -82,6 +82,7 @@ export type Scan = {
   pages_scanned: number;
   pages_total: number;
   resolved_count: number;
+  share_token: string | null;
   started_at: string | null;
   completed_at: string | null;
   error_message: string | null;
@@ -172,6 +173,7 @@ export type ScanInsert = {
   pages_scanned?: number;
   pages_total?: number;
   resolved_count?: number;
+  share_token?: string | null;
   started_at?: string | null;
   completed_at?: string | null;
   error_message?: string | null;
@@ -253,6 +255,7 @@ export type ScanUpdate = {
   pages_scanned?: number;
   pages_total?: number;
   resolved_count?: number;
+  share_token?: string | null;
   started_at?: string | null;
   completed_at?: string | null;
   error_message?: string | null;
