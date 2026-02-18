@@ -81,6 +81,7 @@ export type Scan = {
   minor_count: number;
   pages_scanned: number;
   pages_total: number;
+  resolved_count: number;
   started_at: string | null;
   completed_at: string | null;
   error_message: string | null;
@@ -170,6 +171,7 @@ export type ScanInsert = {
   minor_count?: number;
   pages_scanned?: number;
   pages_total?: number;
+  resolved_count?: number;
   started_at?: string | null;
   completed_at?: string | null;
   error_message?: string | null;
@@ -250,6 +252,7 @@ export type ScanUpdate = {
   minor_count?: number;
   pages_scanned?: number;
   pages_total?: number;
+  resolved_count?: number;
   started_at?: string | null;
   completed_at?: string | null;
   error_message?: string | null;

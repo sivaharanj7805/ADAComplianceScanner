@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { remoteScanSite } from '@/lib/scanner/remote-scan';
+import { markNewViolations } from '@/lib/scanner/compare';
 import {
     sendScanCompleteEmail,
     sendNewViolationsEmail,
@@ -252,7 +253,39 @@ async function processSiteScan(
             const overallScore = summary.overallScore;
             const totalViolations = allViolations.length;
 
-            // 4. Store results in database
+            // 4. Compare with previous scan to mark new/persisting violations
+            let resolvedCount = 0;
+            try {
+                const { data: prevScans } = await supabase
+                    .from('scans')
+                    .select('id')
+                    .eq('site_id', site.id)
+                    .eq('status', 'completed')
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+
+                const prevScanId = prevScans?.[0]?.id;
+                if (prevScanId) {
+                    const { data: prevViolations } = await supabase
+                        .from('violations')
+                        .select('rule_id, css_selector, page_url')
+                        .eq('scan_id', prevScanId);
+
+                    if (prevViolations) {
+                        markNewViolations(allViolations, prevViolations);
+                        const currKeys = new Set(
+                            allViolations.map((v) => `${v.rule_id}::${v.css_selector ?? ''}::${v.page_url}`)
+                        );
+                        resolvedCount = prevViolations.filter(
+                            (v) => !currKeys.has(`${v.rule_id}::${v.css_selector ?? ''}::${v.page_url}`)
+                        ).length;
+                    }
+                }
+            } catch {
+                // Non-critical — violations default to is_new = true
+            }
+
+            // 5. Store results in database
             if (allViolations.length > 0) {
                 await supabase.from('violations').insert(allViolations);
             }
@@ -260,7 +293,7 @@ async function processSiteScan(
                 await supabase.from('scan_pages').insert(scanPages);
             }
 
-            // 5. Update scan record as completed
+            // 6. Update scan record as completed
             await supabase
                 .from('scans')
                 .update({
@@ -273,11 +306,12 @@ async function processSiteScan(
                     minor_count: minorCount,
                     pages_scanned: summary.pagesScanned,
                     pages_total: summary.totalPages,
+                    resolved_count: resolvedCount,
                     completed_at: new Date().toISOString(),
                 })
                 .eq('id', scan.id);
 
-            // 6. Update site stats
+            // 7. Update site stats
             await supabase
                 .from('sites')
                 .update({
@@ -292,7 +326,7 @@ async function processSiteScan(
             siteResult.score = overallScore;
             siteResult.totalViolations = totalViolations;
 
-            // 7. Send notification emails (fire-and-forget)
+            // 8. Send notification emails (fire-and-forget)
             sendNotifications(
                 supabase,
                 site,

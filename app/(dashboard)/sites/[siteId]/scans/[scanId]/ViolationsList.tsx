@@ -12,13 +12,24 @@ import {
   Code,
   Wrench,
   Tag,
+  CheckCircle2,
 } from 'lucide-react';
 import type { Violation, ViolationSeverity } from '@/lib/types/database';
+
+export type ComparisonFilter = 'all' | 'new' | 'resolved' | 'persisting';
 
 interface ViolationsListProps {
   violations: Violation[];
   pageUrls: string[];
   wcagCriteria: string[];
+  /** Resolved violations from the previous scan (not in current) */
+  resolvedViolations?: Violation[];
+  /** IDs of violations that are new (not in previous scan) */
+  newViolationIds?: Set<string>;
+  /** IDs of violations that persisted from the previous scan */
+  persistingViolationIds?: Set<string>;
+  /** Whether comparison data is available */
+  hasComparison?: boolean;
 }
 
 type GroupBy = 'none' | 'page' | 'rule';
@@ -68,15 +79,45 @@ export default function ViolationsList({
   violations,
   pageUrls,
   wcagCriteria,
+  resolvedViolations = [],
+  newViolationIds,
+  persistingViolationIds,
+  hasComparison = false,
 }: ViolationsListProps) {
   const [severityFilter, setSeverityFilter] = useState<ViolationSeverity | 'all'>('all');
   const [pageFilter, setPageFilter] = useState<string>('all');
   const [wcagFilter, setWcagFilter] = useState<string>('all');
+  const [comparisonFilter, setComparisonFilter] = useState<ComparisonFilter>('all');
   const [groupBy, setGroupBy] = useState<GroupBy>('none');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const filtered = useMemo(() => {
+    // When showing resolved, use resolved violations list instead
+    if (comparisonFilter === 'resolved') {
+      let result = resolvedViolations;
+      if (severityFilter !== 'all') {
+        result = result.filter((v) => v.severity === severityFilter);
+      }
+      if (pageFilter !== 'all') {
+        result = result.filter((v) => v.page_url === pageFilter);
+      }
+      if (wcagFilter !== 'all') {
+        result = result.filter((v) => v.wcag_criteria.includes(wcagFilter));
+      }
+      return result.sort(
+        (a, b) =>
+          SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity)
+      );
+    }
+
     let result = violations;
+
+    // Apply comparison filter
+    if (comparisonFilter === 'new' && newViolationIds) {
+      result = result.filter((v) => newViolationIds.has(v.id));
+    } else if (comparisonFilter === 'persisting' && persistingViolationIds) {
+      result = result.filter((v) => persistingViolationIds.has(v.id));
+    }
 
     if (severityFilter !== 'all') {
       result = result.filter((v) => v.severity === severityFilter);
@@ -93,7 +134,12 @@ export default function ViolationsList({
       (a, b) =>
         SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity)
     );
-  }, [violations, severityFilter, pageFilter, wcagFilter]);
+  }, [violations, resolvedViolations, severityFilter, pageFilter, wcagFilter, comparisonFilter, newViolationIds, persistingViolationIds]);
+
+  const isShowingResolved = comparisonFilter === 'resolved';
+  const totalCount = isShowingResolved
+    ? resolvedViolations.length
+    : violations.length;
 
   const grouped = useMemo(() => {
     if (groupBy === 'none') return null;
@@ -180,6 +226,30 @@ export default function ViolationsList({
           </select>
         )}
 
+        {/* Comparison filter (only when comparison data available) */}
+        {hasComparison && (
+          <div className="flex gap-1 rounded-lg border border-gray-200 bg-white p-0.5">
+            {([
+              ['all', 'All'],
+              ['new', 'New'],
+              ['resolved', 'Resolved'],
+              ['persisting', 'Persisting'],
+            ] as const).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setComparisonFilter(key)}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  comparisonFilter === key
+                    ? 'bg-gray-900 text-white'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Group by toggle */}
         <div className="ml-auto flex gap-1 rounded-lg border border-gray-200 bg-white p-0.5">
           {([
@@ -204,8 +274,9 @@ export default function ViolationsList({
 
       {/* Results count */}
       <p className="text-sm text-gray-500">
-        Showing {filtered.length} of {violations.length} violation
-        {violations.length === 1 ? '' : 's'}
+        Showing {filtered.length} of {totalCount}{' '}
+        {isShowingResolved ? 'resolved ' : ''}violation
+        {totalCount === 1 ? '' : 's'}
       </p>
 
       {/* Violations */}
@@ -235,6 +306,8 @@ export default function ViolationsList({
                     expanded={expandedIds.has(v.id)}
                     onToggle={() => toggleExpand(v.id)}
                     showPageUrl={groupBy !== 'page'}
+                    isResolved={isShowingResolved}
+                    isNew={hasComparison && !isShowingResolved && (newViolationIds?.has(v.id) ?? false)}
                   />
                 ))}
               </div>
@@ -251,6 +324,8 @@ export default function ViolationsList({
               expanded={expandedIds.has(v.id)}
               onToggle={() => toggleExpand(v.id)}
               showPageUrl={true}
+              isResolved={isShowingResolved}
+              isNew={hasComparison && !isShowingResolved && (newViolationIds?.has(v.id) ?? false)}
             />
           ))}
         </div>
@@ -272,42 +347,69 @@ function ViolationCard({
   expanded,
   onToggle,
   showPageUrl,
+  isResolved = false,
+  isNew = false,
 }: {
   violation: Violation;
   expanded: boolean;
   onToggle: () => void;
   showPageUrl: boolean;
+  isResolved?: boolean;
+  isNew?: boolean;
 }) {
   const config = SEVERITY_CONFIG[violation.severity];
   const Icon = config.icon;
 
   return (
     <div
-      className={`rounded-xl border bg-white shadow-sm transition-shadow hover:shadow-md ${config.border}`}
+      className={`rounded-xl border bg-white shadow-sm transition-shadow hover:shadow-md ${
+        isResolved ? 'border-emerald-200 bg-emerald-50/30' : config.border
+      }`}
     >
       {/* Header — always visible */}
       <button
         onClick={onToggle}
         className="flex w-full items-start gap-3 px-5 py-4 text-left"
       >
-        <div className={`mt-0.5 rounded-lg p-1.5 ${config.bg}`}>
-          <Icon className={`h-4 w-4 ${config.color}`} />
-        </div>
+        {isResolved ? (
+          <div className="mt-0.5 rounded-lg bg-emerald-100 p-1.5">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+          </div>
+        ) : (
+          <div className={`mt-0.5 rounded-lg p-1.5 ${config.bg}`}>
+            <Icon className={`h-4 w-4 ${config.color}`} />
+          </div>
+        )}
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span
-              className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${config.bg} ${config.color}`}
+              className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                isResolved
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : `${config.bg} ${config.color}`
+              }`}
             >
-              {config.label}
+              {isResolved ? 'Resolved' : config.label}
             </span>
+            {isNew && (
+              <span className="inline-flex items-center rounded-md bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
+                New
+              </span>
+            )}
             {violation.wcag_criteria.length > 0 && (
               <span className="text-[10px] text-gray-400">
                 {violation.wcag_criteria.join(', ')}
               </span>
             )}
           </div>
-          <h4 className="mt-1 text-sm font-semibold text-gray-900">
+          <h4
+            className={`mt-1 text-sm font-semibold ${
+              isResolved
+                ? 'text-gray-400 line-through'
+                : 'text-gray-900'
+            }`}
+          >
             {violation.description}
           </h4>
           {showPageUrl && (

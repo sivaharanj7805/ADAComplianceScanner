@@ -16,6 +16,11 @@ export type {
   ViolationTranslation,
 } from './types';
 
+export type {
+  ScanComparison,
+  ComparableScan,
+} from './compare';
+
 // Page scanning
 export { scanPage } from './scan-page';
 
@@ -27,3 +32,6 @@ export { translateViolation, translateAllViolations } from './translate';
 
 // Compliance scoring
 export { calculateScore } from './score';
+
+// Scan comparison
+export { compareScans, markNewViolations } from './compare';

@@ -326,6 +326,7 @@ export async function getRecentScans(
       minor_count: scan.minor_count,
       pages_scanned: scan.pages_scanned,
       pages_total: scan.pages_total,
+      resolved_count: scan.resolved_count ?? 0,
       started_at: scan.started_at,
       completed_at: scan.completed_at,
       error_message: scan.error_message,
@@ -457,6 +458,7 @@ export async function getScan(
       minor_count: raw.minor_count,
       pages_scanned: raw.pages_scanned,
       pages_total: raw.pages_total,
+      resolved_count: raw.resolved_count ?? 0,
       started_at: raw.started_at,
       completed_at: raw.completed_at,
       error_message: raw.error_message,
@@ -521,6 +523,72 @@ export async function getLastScanTime(
     return { data: null, error: error.message };
   }
   return { data: data.created_at, error: null };
+}
+
+// ============================================================================
+// Scan comparison helpers
+// ============================================================================
+
+/**
+ * Get the completed scan immediately before `currentScanId` for the same site,
+ * along with its violations.  Returns null if there is no prior scan.
+ */
+export async function getPreviousCompletedScan(
+  siteId: string,
+  currentScanId: string,
+  userId: string
+): Promise<{
+  data: { scan: Scan; violations: Violation[] } | null;
+  error: string | null;
+}> {
+  const supabase = await createClient();
+
+  // Get the created_at of the current scan so we can find the one before it
+  const { data: currentScan, error: currentError } = await supabase
+    .from('scans')
+    .select('created_at')
+    .eq('id', currentScanId)
+    .single();
+
+  if (currentError || !currentScan) {
+    return { data: null, error: currentError?.message ?? 'Current scan not found' };
+  }
+
+  // Get the most recent completed scan before this one
+  const { data: prevScan, error: prevError } = await supabase
+    .from('scans')
+    .select('*')
+    .eq('site_id', siteId)
+    .eq('user_id', userId)
+    .eq('status', 'completed')
+    .lt('created_at', currentScan.created_at)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (prevError) {
+    if (prevError.code === 'PGRST116') {
+      // No previous scan exists
+      return { data: null, error: null };
+    }
+    return { data: null, error: prevError.message };
+  }
+
+  // Fetch violations for the previous scan
+  const { data: violations, error: violationsError } = await supabase
+    .from('violations')
+    .select('*')
+    .eq('scan_id', prevScan.id)
+    .order('severity', { ascending: true });
+
+  if (violationsError) {
+    return { data: null, error: violationsError.message };
+  }
+
+  return {
+    data: { scan: prevScan, violations: violations ?? [] },
+    error: null,
+  };
 }
 
 // ============================================================================

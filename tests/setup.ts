@@ -203,6 +203,7 @@ export function createTestScan(overrides: Partial<Scan> = {}): Scan {
     minor_count: 1,
     pages_scanned: 3,
     pages_total: 3,
+    resolved_count: 0,
     started_at: '2025-01-15T10:00:00Z',
     completed_at: '2025-01-15T10:05:00Z',
     error_message: null,
