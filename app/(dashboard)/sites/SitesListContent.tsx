@@ -41,7 +41,7 @@ export default async function SitesListContent({
 
         {atLimit ? (
           <Link
-            href="/dashboard/upgrade"
+            href="/pricing"
             className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-orange-600"
           >
             <Zap className="h-4 w-4" />
