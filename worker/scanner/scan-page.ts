@@ -1,4 +1,4 @@
-import puppeteer from 'puppeteer';
+import puppeteer, { type Browser } from 'puppeteer';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
@@ -147,26 +147,37 @@ function validateUrl(url: string): { valid: true } | { valid: false; error: Page
 
 /**
  * Scan a single page for accessibility violations.
+ *
+ * When `externalBrowser` is provided the caller owns the browser lifecycle —
+ * scanPage will create a new page on it but will **not** close the browser.
+ * When omitted, scanPage launches (and closes) its own browser instance.
  */
-export async function scanPage(url: string): Promise<PageScanOutcome> {
+export async function scanPage(
+  url: string,
+  externalBrowser?: Browser,
+): Promise<PageScanOutcome> {
   const validation = validateUrl(url);
   if (!validation.valid) {
     return { success: false, error: validation.error };
   }
 
-  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
+  // Track whether we own the browser so we know whether to close it.
+  const ownsTheBrowser = !externalBrowser;
+  let browser: Browser | null = externalBrowser ?? null;
 
   try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--disable-software-rasterizer',
-      ],
-    });
+    if (!browser) {
+      browser = await puppeteer.launch({
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--disable-software-rasterizer',
+        ],
+      });
+    }
 
     const page = await browser.newPage();
 
@@ -294,7 +305,7 @@ export async function scanPage(url: string): Promise<PageScanOutcome> {
       },
     };
   } finally {
-    if (browser) {
+    if (browser && ownsTheBrowser) {
       try {
         await browser.close();
       } catch {

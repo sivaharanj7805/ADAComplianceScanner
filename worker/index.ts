@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import puppeteer from 'puppeteer';
 import { scanPage } from './scanner/scan-page';
 import { crawlSite } from './scanner/crawl-site';
 import type { PageScanOutcome } from './scanner/types';
@@ -144,16 +145,36 @@ app.post('/scan', async (req, res) => {
     let pagesFailed = 0;
     let totalScore = 0;
 
-    for (const pageUrl of crawlResult.urls) {
-      console.log(`[POST /scan] Scanning page ${pagesScanned + pagesFailed + 1}/${crawlResult.urls.length}: ${pageUrl}`);
-      const outcome = await scanPage(pageUrl);
-      pageOutcomes.push(outcome);
+    // Launch a single browser instance and reuse it for every page in this scan.
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-software-rasterizer',
+      ],
+    });
 
-      if (outcome.success) {
-        pagesScanned++;
-        totalScore += outcome.result.score;
-      } else {
-        pagesFailed++;
+    try {
+      for (const pageUrl of crawlResult.urls) {
+        console.log(`[POST /scan] Scanning page ${pagesScanned + pagesFailed + 1}/${crawlResult.urls.length}: ${pageUrl}`);
+        const outcome = await scanPage(pageUrl, browser);
+        pageOutcomes.push(outcome);
+
+        if (outcome.success) {
+          pagesScanned++;
+          totalScore += outcome.result.score;
+        } else {
+          pagesFailed++;
+        }
+      }
+    } finally {
+      try {
+        await browser.close();
+      } catch {
+        // Browser may already be closed if it crashed
       }
     }
 

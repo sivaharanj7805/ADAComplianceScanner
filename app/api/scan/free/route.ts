@@ -1,48 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { remoteScanPage } from '@/lib/scanner/remote-scan';
+import { freeScanLimiter } from '@/lib/utils/rate-limit';
 import type { TranslatedViolation } from '@/lib/scanner';
-
-// ============================================================================
-// Rate limiting (in-memory — upgrade to Redis/Upstash for production)
-// ============================================================================
-
-interface RateLimitEntry {
-  count: number;
-  resetAt: number;
-}
-
-const rateLimitMap = new Map<string, RateLimitEntry>();
-
-const RATE_LIMIT_MAX = 10;
-const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return false;
-  }
-
-  if (entry.count >= RATE_LIMIT_MAX) {
-    return true;
-  }
-
-  entry.count++;
-  return false;
-}
-
-// Periodically clean up expired entries to prevent memory leaks
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, entry] of rateLimitMap) {
-    if (now > entry.resetAt) {
-      rateLimitMap.delete(ip);
-    }
-  }
-}, 10 * 60 * 1000); // Every 10 minutes
 
 // ============================================================================
 // Request validation
@@ -87,7 +47,7 @@ export async function POST(request: NextRequest) {
     const forwarded = request.headers.get('x-forwarded-for');
     const ip = forwarded?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown';
 
-    if (isRateLimited(ip)) {
+    if (freeScanLimiter.isLimited(ip)) {
       return NextResponse.json(
         {
           error: 'Rate limit exceeded. You can scan up to 10 pages per hour. Please try again later.',

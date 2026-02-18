@@ -162,9 +162,12 @@ CREATE INDEX idx_scans_site_id ON scans (site_id);
 CREATE INDEX idx_scans_user_id ON scans (user_id);
 CREATE INDEX idx_scans_status ON scans (status);
 CREATE INDEX idx_scans_share_token ON scans (share_token) WHERE share_token IS NOT NULL;
+CREATE INDEX idx_scans_site_status_created ON scans (site_id, status, created_at DESC);
 CREATE INDEX idx_violations_scan_id ON violations (scan_id);
 CREATE INDEX idx_violations_site_id ON violations (site_id);
+CREATE INDEX idx_violations_severity ON violations (severity);
 CREATE INDEX idx_scan_pages_scan_id ON scan_pages (scan_id);
+CREATE INDEX idx_profiles_stripe_customer ON profiles (stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;
 
 -- ============================================================================
 -- ROW LEVEL SECURITY
