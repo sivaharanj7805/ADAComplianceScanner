@@ -3,6 +3,7 @@
 
 // Types
 export type {
+  ViolationSeverity,
   AxeNode,
   AxeViolation,
   AxeResults,

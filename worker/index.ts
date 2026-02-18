@@ -1,9 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import puppeteer from 'puppeteer';
-import { scanPage } from './scanner/scan-page';
-import { crawlSite } from './scanner/crawl-site';
-import type { PageScanOutcome } from './scanner/types';
+import { scanPage } from '../lib/scanner/scan-page';
+import { crawlSite } from '../lib/scanner/crawl-site';
+import type { PageScanOutcome } from '../lib/scanner/types';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
