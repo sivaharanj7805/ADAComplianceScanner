@@ -5,7 +5,7 @@ import {
   createTestProfile,
   createTestSite,
   createTestScan,
-  createSuccessfulScanOutcome,
+  createTestTranslatedViolation,
 } from '../setup';
 
 // Import mocked modules
@@ -21,8 +21,17 @@ import {
   getLastScanTime,
   getViolations,
 } from '@/lib/supabase/queries';
-import { scanPage } from '@/lib/scanner/scan-page';
-import { crawlSite } from '@/lib/scanner/crawl-site';
+
+// Mock remoteScanSite — this is what the trigger route actually uses
+const mockRemoteScanSite = vi.fn();
+vi.mock('@/lib/scanner/remote-scan', () => ({
+  remoteScanSite: mockRemoteScanSite,
+}));
+
+// Mock markNewViolations from compare
+vi.mock('@/lib/scanner/compare', () => ({
+  markNewViolations: vi.fn(),
+}));
 
 const { POST } = await import('@/app/api/scan/trigger/route');
 
@@ -36,8 +45,6 @@ const mockedInsertViolations = vi.mocked(insertViolations);
 const mockedInsertScanPages = vi.mocked(insertScanPages);
 const mockedGetLastScanTime = vi.mocked(getLastScanTime);
 const mockedGetViolations = vi.mocked(getViolations);
-const mockedScanPage = vi.mocked(scanPage);
-const mockedCrawlSite = vi.mocked(crawlSite);
 
 function createRequest(body: unknown): NextRequest {
   return new NextRequest('http://localhost:3000/api/scan/trigger', {
@@ -59,7 +66,7 @@ function setupAuthenticatedUser(userId = 'user-123') {
       order: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue({ data: [], error: null }),
     }),
-  } as any);
+  } as unknown as Awaited<ReturnType<typeof createClient>>);
 }
 
 function setupUnauthenticatedUser() {
@@ -67,7 +74,48 @@ function setupUnauthenticatedUser() {
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
     },
-  } as any);
+  } as unknown as Awaited<ReturnType<typeof createClient>>);
+}
+
+/** Helper to create a RemoteMultiPageScanResult matching the route's expected shape */
+function createRemoteScanResult(overrides: {
+  url?: string;
+  score?: number;
+  pagesScanned?: number;
+} = {}) {
+  const url = overrides.url ?? 'https://example.com';
+  const score = overrides.score ?? 85;
+  const pagesScanned = overrides.pagesScanned ?? 1;
+  const violation = createTestTranslatedViolation();
+
+  return {
+    crawl: {
+      baseUrl: url,
+      totalFound: pagesScanned,
+      limitApplied: 10,
+      skipped: [],
+    },
+    pages: [
+      {
+        success: true as const,
+        result: {
+          url,
+          score,
+          violations: [violation],
+          pageTitle: 'Test Page',
+          timestamp: new Date().toISOString(),
+          passingRuleCount: 50,
+          totalRuleCount: 55,
+        },
+      },
+    ],
+    summary: {
+      overallScore: score,
+      pagesScanned,
+      pagesFailed: 0,
+      totalPages: pagesScanned,
+    },
+  };
 }
 
 describe('POST /api/scan/trigger', () => {
@@ -93,25 +141,17 @@ describe('POST /api/scan/trigger', () => {
     const profile = createTestProfile({ plan: 'agency_starter', pages_per_site_limit: 10 });
     const scan = createTestScan({ id: 'new-scan-id', status: 'pending' });
 
-    mockedGetSite.mockResolvedValue({ data: site, error: null } as any);
-    mockedGetProfile.mockResolvedValue({ data: profile, error: null } as any);
-    mockedCreateScan.mockResolvedValue({ data: scan, error: null } as any);
-    mockedUpdateScan.mockResolvedValue({ data: scan, error: null } as any);
-    mockedUpdateSite.mockResolvedValue({ data: site, error: null } as any);
-    mockedInsertViolations.mockResolvedValue({ data: [], error: null } as any);
-    mockedInsertScanPages.mockResolvedValue({ data: [], error: null } as any);
-    mockedGetViolations.mockResolvedValue({ data: [], error: null } as any);
+    mockedGetSite.mockResolvedValue({ data: site, error: null } as never);
+    mockedGetProfile.mockResolvedValue({ data: profile, error: null } as never);
+    mockedCreateScan.mockResolvedValue({ data: scan, error: null } as never);
+    mockedUpdateScan.mockResolvedValue({ data: scan, error: null } as never);
+    mockedUpdateSite.mockResolvedValue({ data: site, error: null } as never);
+    mockedInsertViolations.mockResolvedValue({ data: [], error: null } as never);
+    mockedInsertScanPages.mockResolvedValue({ data: [], error: null } as never);
+    mockedGetViolations.mockResolvedValue({ data: [], error: null } as never);
 
-    mockedCrawlSite.mockResolvedValue({
-      baseUrl: 'https://example.com',
-      urls: ['https://example.com'],
-      totalFound: 1,
-      limitApplied: 10,
-      skipped: [],
-    });
-
-    mockedScanPage.mockResolvedValue(
-      createSuccessfulScanOutcome({ url: 'https://example.com', score: 90 })
+    mockRemoteScanSite.mockResolvedValue(
+      createRemoteScanResult({ url: 'https://example.com', score: 90 })
     );
 
     const req = createRequest({ siteId: '550e8400-e29b-41d4-a716-446655440000' });
@@ -129,7 +169,7 @@ describe('POST /api/scan/trigger', () => {
     setupAuthenticatedUser('user-123');
 
     // getSite returns null (site not found for this user due to RLS)
-    mockedGetSite.mockResolvedValue({ data: null, error: 'Not found' } as any);
+    mockedGetSite.mockResolvedValue({ data: null, error: 'Not found' } as never);
 
     const req = createRequest({ siteId: '550e8400-e29b-41d4-a716-446655440000' });
     const res = await POST(req);
@@ -145,12 +185,12 @@ describe('POST /api/scan/trigger', () => {
     const site = createTestSite({ id: '550e8400-e29b-41d4-a716-446655440000' });
     const profile = createTestProfile({ plan: 'free' });
 
-    mockedGetSite.mockResolvedValue({ data: site, error: null } as any);
-    mockedGetProfile.mockResolvedValue({ data: profile, error: null } as any);
+    mockedGetSite.mockResolvedValue({ data: site, error: null } as never);
+    mockedGetProfile.mockResolvedValue({ data: profile, error: null } as never);
 
     // Last scan was 30 minutes ago (within 1 hour window)
     const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-    mockedGetLastScanTime.mockResolvedValue({ data: thirtyMinutesAgo, error: null } as any);
+    mockedGetLastScanTime.mockResolvedValue({ data: thirtyMinutesAgo, error: null } as never);
 
     const req = createRequest({ siteId: '550e8400-e29b-41d4-a716-446655440000' });
     const res = await POST(req);
@@ -176,8 +216,8 @@ describe('POST /api/scan/trigger', () => {
     setupAuthenticatedUser('user-123');
 
     const site = createTestSite({ id: '550e8400-e29b-41d4-a716-446655440000' });
-    mockedGetSite.mockResolvedValue({ data: site, error: null } as any);
-    mockedGetProfile.mockResolvedValue({ data: null, error: null } as any);
+    mockedGetSite.mockResolvedValue({ data: site, error: null } as never);
+    mockedGetProfile.mockResolvedValue({ data: null, error: null } as never);
 
     const req = createRequest({ siteId: '550e8400-e29b-41d4-a716-446655440000' });
     const res = await POST(req);
@@ -194,25 +234,17 @@ describe('POST /api/scan/trigger', () => {
     const profile = createTestProfile({ plan: 'agency_starter', pages_per_site_limit: 10 });
     const scan = createTestScan({ id: 'paid-scan-id' });
 
-    mockedGetSite.mockResolvedValue({ data: site, error: null } as any);
-    mockedGetProfile.mockResolvedValue({ data: profile, error: null } as any);
-    mockedCreateScan.mockResolvedValue({ data: scan, error: null } as any);
-    mockedUpdateScan.mockResolvedValue({ data: scan, error: null } as any);
-    mockedUpdateSite.mockResolvedValue({ data: site, error: null } as any);
-    mockedInsertViolations.mockResolvedValue({ data: [], error: null } as any);
-    mockedInsertScanPages.mockResolvedValue({ data: [], error: null } as any);
-    mockedGetViolations.mockResolvedValue({ data: [], error: null } as any);
+    mockedGetSite.mockResolvedValue({ data: site, error: null } as never);
+    mockedGetProfile.mockResolvedValue({ data: profile, error: null } as never);
+    mockedCreateScan.mockResolvedValue({ data: scan, error: null } as never);
+    mockedUpdateScan.mockResolvedValue({ data: scan, error: null } as never);
+    mockedUpdateSite.mockResolvedValue({ data: site, error: null } as never);
+    mockedInsertViolations.mockResolvedValue({ data: [], error: null } as never);
+    mockedInsertScanPages.mockResolvedValue({ data: [], error: null } as never);
+    mockedGetViolations.mockResolvedValue({ data: [], error: null } as never);
 
-    mockedCrawlSite.mockResolvedValue({
-      baseUrl: 'https://example.com',
-      urls: ['https://example.com'],
-      totalFound: 1,
-      limitApplied: 10,
-      skipped: [],
-    });
-
-    mockedScanPage.mockResolvedValue(
-      createSuccessfulScanOutcome({ url: 'https://example.com' })
+    mockRemoteScanSite.mockResolvedValue(
+      createRemoteScanResult({ url: 'https://example.com' })
     );
 
     // getLastScanTime should NOT be called for paid plans

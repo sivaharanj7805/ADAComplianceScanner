@@ -9,6 +9,7 @@ import {
   createTestProfile,
   createTestViolation,
 } from '../../setup';
+import type { Violation } from '@/lib/types/database';
 import type { StatementOptions } from '@/lib/reports/generate-statement';
 
 function createDefaultOptions(overrides: Partial<StatementOptions> = {}): StatementOptions {
@@ -49,7 +50,7 @@ describe('generateAccessibilityStatement', () => {
   it('should include the scan date', () => {
     const site = createTestSite();
     const scan = createTestScan({ completed_at: '2025-06-15T12:00:00Z' });
-    const violations: any[] = [];
+    const violations: Violation[] = [];
     const profile = createTestProfile();
     const options = createDefaultOptions();
 
@@ -103,7 +104,7 @@ describe('generateAccessibilityStatement', () => {
   it('should include the compliance score', () => {
     const site = createTestSite();
     const scan = createTestScan({ score: 85 });
-    const violations: any[] = [];
+    const violations: Violation[] = [];
     const profile = createTestProfile();
     const options = createDefaultOptions();
 
@@ -115,7 +116,7 @@ describe('generateAccessibilityStatement', () => {
   it('should include WCAG reference', () => {
     const site = createTestSite();
     const scan = createTestScan();
-    const violations: any[] = [];
+    const violations: Violation[] = [];
     const profile = createTestProfile();
     const options = createDefaultOptions();
 
@@ -129,7 +130,7 @@ describe('generateAccessibilityStatement', () => {
   it('should include contact email when provided', () => {
     const site = createTestSite();
     const scan = createTestScan();
-    const violations: any[] = [];
+    const violations: Violation[] = [];
     const profile = createTestProfile();
     const options = createDefaultOptions({ contactEmail: 'help@example.com' });
 
@@ -141,7 +142,7 @@ describe('generateAccessibilityStatement', () => {
 
   it('should handle null scan gracefully', () => {
     const site = createTestSite({ current_score: 50 });
-    const violations: any[] = [];
+    const violations: Violation[] = [];
     const profile = createTestProfile();
     const options = createDefaultOptions();
 
@@ -155,7 +156,7 @@ describe('generateAccessibilityStatement', () => {
   it('should include additional commitment text when provided', () => {
     const site = createTestSite();
     const scan = createTestScan();
-    const violations: any[] = [];
+    const violations: Violation[] = [];
     const profile = createTestProfile();
     const options = createDefaultOptions({
       additionalCommitment: 'We hire accessibility consultants annually.',
@@ -169,7 +170,7 @@ describe('generateAccessibilityStatement', () => {
   it('should include pages scanned count', () => {
     const site = createTestSite();
     const scan = createTestScan({ pages_scanned: 15 });
-    const violations: any[] = [];
+    const violations: Violation[] = [];
     const profile = createTestProfile();
     const options = createDefaultOptions();
 
@@ -183,7 +184,7 @@ describe('statementToPlainText', () => {
   it('should strip HTML tags and produce readable text', () => {
     const site = createTestSite();
     const scan = createTestScan();
-    const violations: any[] = [];
+    const violations: Violation[] = [];
     const profile = createTestProfile();
     const options = createDefaultOptions();
 

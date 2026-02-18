@@ -1,4 +1,4 @@
-import type { PageScanOutcome, PageScanResult, CrawlResult } from './types';
+import type { PageScanOutcome, PageScanResult } from './types';
 
 // ============================================================================
 // Remote scan client — calls the Railway scanning worker over HTTP

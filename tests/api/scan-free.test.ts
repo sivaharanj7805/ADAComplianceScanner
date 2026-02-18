@@ -6,10 +6,10 @@ import {
   createTestTranslatedViolation,
 } from '../setup';
 
-// Get a reference to the mocked scanPage from the barrel import
-const mockScanPage = vi.fn();
-vi.mock('@/lib/scanner', () => ({
-  scanPage: mockScanPage,
+// Mock the remote scan module used by the free scan route
+const mockRemoteScanPage = vi.fn();
+vi.mock('@/lib/scanner/remote-scan', () => ({
+  remoteScanPage: mockRemoteScanPage,
 }));
 
 // Must import POST after mocks are set up
@@ -39,7 +39,7 @@ describe('POST /api/scan/free', () => {
       pageTitle: 'Test Page',
       violations: [createTestTranslatedViolation()],
     });
-    mockScanPage.mockResolvedValueOnce(outcome);
+    mockRemoteScanPage.mockResolvedValueOnce(outcome);
 
     const uniqueIp = `10.0.1.${Math.floor(Math.random() * 255)}`;
     const req = createRequest({ url: 'https://example.com' }, uniqueIp);
@@ -84,7 +84,7 @@ describe('POST /api/scan/free', () => {
 
   it('should return 429 when rate limited (more than 10 per hour)', async () => {
     const rateLimitIp = `10.99.0.${Math.floor(Math.random() * 255)}`;
-    mockScanPage.mockResolvedValue(createSuccessfulScanOutcome());
+    mockRemoteScanPage.mockResolvedValue(createSuccessfulScanOutcome());
 
     // Make 10 requests (the limit)
     for (let i = 0; i < 10; i++) {
@@ -103,7 +103,7 @@ describe('POST /api/scan/free', () => {
   });
 
   it('should return response matching expected shape', async () => {
-    mockScanPage.mockResolvedValueOnce(
+    mockRemoteScanPage.mockResolvedValueOnce(
       createSuccessfulScanOutcome({ score: 75, pageTitle: 'Shape Test' })
     );
 
@@ -133,7 +133,7 @@ describe('POST /api/scan/free', () => {
         title: `Violation ${i}`,
       })
     );
-    mockScanPage.mockResolvedValueOnce(
+    mockRemoteScanPage.mockResolvedValueOnce(
       createSuccessfulScanOutcome({ violations: manyViolations })
     );
 
@@ -148,7 +148,7 @@ describe('POST /api/scan/free', () => {
   });
 
   it('should return 422 when scan fails', async () => {
-    mockScanPage.mockResolvedValueOnce(createFailedScanOutcome('https://fail.com'));
+    mockRemoteScanPage.mockResolvedValueOnce(createFailedScanOutcome('https://fail.com'));
 
     const uniqueIp = `10.0.7.${Math.floor(Math.random() * 255)}`;
     const req = createRequest({ url: 'https://fail.com' }, uniqueIp);

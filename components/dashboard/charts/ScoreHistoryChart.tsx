@@ -60,7 +60,7 @@ export default function ScoreHistoryChart({
                     <Tooltip
                         contentStyle={tooltipStyle}
                         labelFormatter={(label) => `Date: ${label}`}
-                        formatter={(value: number) => [value, 'Score']}
+                        formatter={(value: number | undefined) => [value ?? 0, 'Score']}
                     />
                     <ReferenceLine
                         y={80}

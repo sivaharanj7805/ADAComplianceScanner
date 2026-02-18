@@ -1,9 +1,33 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-// The actual stripe webhook is a stub that just returns { received: true }
-// We test the current implementation and also write tests for the expected
-// behavior that should be implemented.
+// Mock Stripe module before importing the route
+const mockConstructEvent = vi.fn();
+vi.mock('stripe', () => {
+  return {
+    default: class Stripe {
+      webhooks = {
+        constructEvent: mockConstructEvent,
+      };
+    },
+  };
+});
+
+// Mock admin client
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: () => ({
+    from: vi.fn().mockReturnValue({
+      update: vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+      }),
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({ data: { id: 'user-123' }, error: null }),
+        }),
+      }),
+    }),
+  }),
+}));
 
 const { POST } = await import('@/app/api/webhooks/stripe/route');
 
@@ -19,18 +43,25 @@ function createWebhookRequest(body: unknown, signature = 'valid-sig'): NextReque
 }
 
 describe('POST /api/webhooks/stripe', () => {
-  const originalEnv = process.env.STRIPE_WEBHOOK_SECRET;
+  const originalWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const originalStripeKey = process.env.STRIPE_SECRET_KEY;
 
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_secret';
+    process.env.STRIPE_SECRET_KEY = 'sk_test_key';
   });
 
   afterEach(() => {
-    if (originalEnv !== undefined) {
-      process.env.STRIPE_WEBHOOK_SECRET = originalEnv;
+    if (originalWebhookSecret !== undefined) {
+      process.env.STRIPE_WEBHOOK_SECRET = originalWebhookSecret;
     } else {
       delete process.env.STRIPE_WEBHOOK_SECRET;
+    }
+    if (originalStripeKey !== undefined) {
+      process.env.STRIPE_SECRET_KEY = originalStripeKey;
+    } else {
+      delete process.env.STRIPE_SECRET_KEY;
     }
   });
 
@@ -64,7 +95,31 @@ describe('POST /api/webhooks/stripe', () => {
     expect(data.error).toBe('Webhook not configured');
   });
 
-  it('should return received: true for valid request with secret configured', async () => {
+  it('should return 400 when signature verification fails', async () => {
+    mockConstructEvent.mockImplementation(() => {
+      throw new Error('Invalid signature');
+    });
+
+    const req = createWebhookRequest({ type: 'checkout.session.completed' });
+    const res = await POST(req);
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toBe('Webhook signature verification failed');
+  });
+
+  it('should return received: true for valid request with verified signature', async () => {
+    mockConstructEvent.mockReturnValue({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_test_123',
+          customer: 'cus_test_123',
+          subscription: 'sub_test_123',
+          metadata: { userId: 'user-123', planId: 'agency_starter' },
+        },
+      },
+    });
+
     const req = createWebhookRequest({ type: 'checkout.session.completed' });
     const res = await POST(req);
     const data = await res.json();
@@ -73,21 +128,21 @@ describe('POST /api/webhooks/stripe', () => {
     expect(data.received).toBe(true);
   });
 
-  describe('checkout.session.completed (expected behavior)', () => {
-    it('should acknowledge webhook receipt', async () => {
-      const event = {
+  describe('checkout.session.completed', () => {
+    it('should acknowledge webhook receipt and process event', async () => {
+      mockConstructEvent.mockReturnValue({
         type: 'checkout.session.completed',
         data: {
           object: {
             id: 'cs_test_123',
             customer: 'cus_test_123',
             subscription: 'sub_test_123',
-            metadata: { userId: 'user-123', plan: 'agency_starter' },
+            metadata: { userId: 'user-123', planId: 'agency_starter' },
           },
         },
-      };
+      });
 
-      const req = createWebhookRequest(event);
+      const req = createWebhookRequest({});
       const res = await POST(req);
       const data = await res.json();
 
@@ -96,9 +151,9 @@ describe('POST /api/webhooks/stripe', () => {
     });
   });
 
-  describe('customer.subscription.deleted (expected behavior)', () => {
-    it('should acknowledge webhook receipt', async () => {
-      const event = {
+  describe('customer.subscription.deleted', () => {
+    it('should acknowledge webhook receipt and reset to free plan', async () => {
+      mockConstructEvent.mockReturnValue({
         type: 'customer.subscription.deleted',
         data: {
           object: {
@@ -107,9 +162,9 @@ describe('POST /api/webhooks/stripe', () => {
             status: 'canceled',
           },
         },
-      };
+      });
 
-      const req = createWebhookRequest(event);
+      const req = createWebhookRequest({});
       const res = await POST(req);
       const data = await res.json();
 

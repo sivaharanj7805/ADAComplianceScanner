@@ -86,9 +86,9 @@ export default function ComplianceStatusChart({
                     </Pie>
                     <Tooltip
                         contentStyle={tooltipStyle}
-                        formatter={(value: number, name: string) => [
-                            `${value} site${value === 1 ? '' : 's'}`,
-                            name,
+                        formatter={(value: number | undefined, name: string | undefined) => [
+                            `${value ?? 0} site${value === 1 ? '' : 's'}`,
+                            name ?? '',
                         ]}
                     />
                     <Legend
