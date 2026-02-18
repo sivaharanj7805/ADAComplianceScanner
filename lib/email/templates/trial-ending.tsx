@@ -116,7 +116,7 @@ export function TrialEndingEmail({
             </Section>
 
             <Text style={subtext}>
-              Plans start at just $49/month. All plans include unlimited scans,
+              Plans start at just $79/month. All plans include automated scans,
               weekly monitoring, and PDF reports.
             </Text>
           </Section>

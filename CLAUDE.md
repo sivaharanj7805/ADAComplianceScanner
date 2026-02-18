@@ -38,7 +38,7 @@ A SaaS product that scans websites for ADA/WCAG 2.1 AA accessibility violations,
 ## Key Business Logic
 - Free scanner: scan 1 URL, return top 10 violations, require email for full results
 - Paid plans: scheduled scans (weekly), multi-page crawling, historical tracking, PDF reports
-- Compliance score: 0-100 calculated as (passing_rules / total_rules) * 100
+- Compliance score: 0-100 calculated as penalty-based (start at 100, subtract weighted penalties per violation: critical=-5, serious=-3, moderate=-1.5, minor=-0.5 per instance)
 - Violation severity: critical (blocks access), serious (major barrier), moderate (some barrier), minor (best practice)
 - Agency plans include white-label: their logo, their colors, their domain on reports
 

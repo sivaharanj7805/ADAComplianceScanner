@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import puppeteer from 'puppeteer';
 import { scanPage } from './scanner/scan-page';
 import { crawlSite } from './scanner/crawl-site';
 import type { PageScanOutcome } from './scanner/types';
@@ -12,8 +13,20 @@ const API_KEY = process.env.API_KEY;
 // Middleware
 // ============================================================================
 
-app.use(cors());
-app.use(express.json());
+// Restrict CORS to the main application origin in production.
+// Falls back to allowing all origins in development.
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+  : undefined;
+
+app.use(
+  cors(
+    ALLOWED_ORIGINS
+      ? { origin: ALLOWED_ORIGINS, methods: ['GET', 'POST'] }
+      : undefined
+  )
+);
+app.use(express.json({ limit: '1mb' }));
 
 /**
  * API key authentication middleware.
@@ -132,16 +145,36 @@ app.post('/scan', async (req, res) => {
     let pagesFailed = 0;
     let totalScore = 0;
 
-    for (const pageUrl of crawlResult.urls) {
-      console.log(`[POST /scan] Scanning page ${pagesScanned + pagesFailed + 1}/${crawlResult.urls.length}: ${pageUrl}`);
-      const outcome = await scanPage(pageUrl);
-      pageOutcomes.push(outcome);
+    // Launch a single browser instance and reuse it for every page in this scan.
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-software-rasterizer',
+      ],
+    });
 
-      if (outcome.success) {
-        pagesScanned++;
-        totalScore += outcome.result.score;
-      } else {
-        pagesFailed++;
+    try {
+      for (const pageUrl of crawlResult.urls) {
+        console.log(`[POST /scan] Scanning page ${pagesScanned + pagesFailed + 1}/${crawlResult.urls.length}: ${pageUrl}`);
+        const outcome = await scanPage(pageUrl, browser);
+        pageOutcomes.push(outcome);
+
+        if (outcome.success) {
+          pagesScanned++;
+          totalScore += outcome.result.score;
+        } else {
+          pagesFailed++;
+        }
+      }
+    } finally {
+      try {
+        await browser.close();
+      } catch {
+        // Browser may already be closed if it crashed
       }
     }
 

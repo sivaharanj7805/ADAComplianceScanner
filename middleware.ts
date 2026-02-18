@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
-const PROTECTED_PATHS = ['/dashboard', '/settings'];
+const PROTECTED_PATHS = ['/dashboard', '/settings', '/sites'];
 const AUTH_PATHS = ['/login', '/signup'];
 
 function isProtected(pathname: string): boolean {

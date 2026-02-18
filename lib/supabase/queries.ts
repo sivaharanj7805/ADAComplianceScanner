@@ -1,4 +1,5 @@
 import { createClient } from './server';
+import { createAdminClient } from './admin';
 import type {
   Profile,
   ProfileUpdate,
@@ -621,7 +622,10 @@ export async function getScanByShareToken(
   } | null;
   error: string | null;
 }> {
-  const supabase = await createClient();
+  // Use admin client to bypass RLS — share token provides authorization.
+  // The regular server client would fail for unauthenticated users because
+  // RLS requires auth.uid() = user_id on the scans table.
+  const supabase = createAdminClient();
 
   const { data: scan, error: scanError } = await supabase
     .from('scans')

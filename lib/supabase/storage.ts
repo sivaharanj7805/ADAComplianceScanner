@@ -13,12 +13,12 @@ export async function uploadAgencyLogo(
 ): Promise<{ data: { url: string; path: string } | null; error: string | null }> {
   const supabase = await createClient();
 
-  // Validate file type
-  const allowedTypes = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
+  // Validate file type (SVG excluded — can contain embedded scripts)
+  const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
   if (!allowedTypes.includes(file.type)) {
     return {
       data: null,
-      error: 'Invalid file type. Allowed: PNG, JPEG, SVG, WebP',
+      error: 'Invalid file type. Allowed: PNG, JPEG, WebP',
     };
   }
 
@@ -32,7 +32,6 @@ export async function uploadAgencyLogo(
   const extMap: Record<string, string> = {
     'image/png': 'png',
     'image/jpeg': 'jpg',
-    'image/svg+xml': 'svg',
     'image/webp': 'webp',
   };
   const ext = extMap[file.type] ?? 'png';

@@ -1,8 +1,19 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import { z } from 'zod/v4';
 import { createClient } from '@/lib/supabase/server';
+import { authLimiter } from '@/lib/utils/rate-limit';
+
+function getClientIp(): string {
+  try {
+    const hdrs = headers() as unknown as { get: (key: string) => string | null };
+    return hdrs.get('x-forwarded-for')?.split(',')[0]?.trim() || hdrs.get('x-real-ip') || 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
 
 export type AuthState = {
   error?: string;
@@ -35,6 +46,11 @@ export async function signIn(
   formData: FormData
 ): Promise<AuthState> {
   try {
+    const ip = getClientIp();
+    if (authLimiter.isLimited(`login:${ip}`)) {
+      return { error: 'Too many login attempts. Please try again in 15 minutes.' };
+    }
+
     const raw = {
       email: formData.get('email') as string,
       password: formData.get('password') as string,
@@ -72,6 +88,11 @@ export async function signUp(
   formData: FormData
 ): Promise<AuthState> {
   try {
+    const ip = getClientIp();
+    if (authLimiter.isLimited(`signup:${ip}`)) {
+      return { error: 'Too many signup attempts. Please try again in 15 minutes.' };
+    }
+
     const raw = {
       email: formData.get('email') as string,
       password: formData.get('password') as string,
@@ -118,6 +139,11 @@ export async function resetPassword(
   formData: FormData
 ): Promise<AuthState> {
   try {
+    const ip = getClientIp();
+    if (authLimiter.isLimited(`reset:${ip}`)) {
+      return { error: 'Too many reset attempts. Please try again in 15 minutes.' };
+    }
+
     const raw = {
       email: formData.get('email') as string,
     };

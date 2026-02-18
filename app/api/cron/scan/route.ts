@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { remoteScanSite } from '@/lib/scanner/remote-scan';
 import { markNewViolations } from '@/lib/scanner/compare';
@@ -44,7 +45,12 @@ export async function GET(request: NextRequest) {
         );
     }
 
-    if (authHeader !== `Bearer ${cronSecret}`) {
+    const expected = `Bearer ${cronSecret}`;
+    if (
+        !authHeader ||
+        authHeader.length !== expected.length ||
+        !timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected))
+    ) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
