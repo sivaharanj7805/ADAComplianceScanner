@@ -157,7 +157,6 @@ interface ScanResult {
 // Site scan processing
 // ============================================================================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AdminClient = ReturnType<typeof createAdminClient>;
 
 async function processSiteScan(

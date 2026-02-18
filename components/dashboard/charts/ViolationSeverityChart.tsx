@@ -55,10 +55,13 @@ export default function ViolationSeverityChart({
                     </Pie>
                     <Tooltip
                         contentStyle={tooltipStyle}
-                        formatter={(value: number, name: string) => [
-                            `${value} (${total > 0 ? Math.round((value / total) * 100) : 0}%)`,
-                            name,
-                        ]}
+                        formatter={(value: number | undefined, name: string | undefined) => {
+                            const v = value ?? 0;
+                            return [
+                                `${v} (${total > 0 ? Math.round((v / total) * 100) : 0}%)`,
+                                name ?? '',
+                            ];
+                        }}
                     />
                     <Legend
                         verticalAlign="bottom"

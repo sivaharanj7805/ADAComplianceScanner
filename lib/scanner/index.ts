@@ -35,3 +35,7 @@ export { calculateScore } from './score';
 
 // Scan comparison
 export { compareScans, markNewViolations } from './compare';
+
+// Remote scanning (Railway worker)
+export { remoteScanPage, remoteScanSite } from './remote-scan';
+export type { RemoteMultiPageScanResult } from './remote-scan';

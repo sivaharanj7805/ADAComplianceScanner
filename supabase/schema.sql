@@ -102,6 +102,8 @@ CREATE TABLE scans (
   minor_count integer NOT NULL DEFAULT 0,
   pages_scanned integer NOT NULL DEFAULT 0,
   pages_total integer NOT NULL DEFAULT 0,
+  resolved_count integer NOT NULL DEFAULT 0,
+  share_token text UNIQUE,
   started_at timestamptz,
   completed_at timestamptz,
   error_message text,
@@ -158,8 +160,11 @@ CREATE TABLE agency_settings (
 CREATE INDEX idx_sites_user_id ON sites (user_id);
 CREATE INDEX idx_scans_site_id ON scans (site_id);
 CREATE INDEX idx_scans_user_id ON scans (user_id);
+CREATE INDEX idx_scans_status ON scans (status);
+CREATE INDEX idx_scans_share_token ON scans (share_token) WHERE share_token IS NOT NULL;
 CREATE INDEX idx_violations_scan_id ON violations (scan_id);
 CREATE INDEX idx_violations_site_id ON violations (site_id);
+CREATE INDEX idx_scan_pages_scan_id ON scan_pages (scan_id);
 
 -- ============================================================================
 -- ROW LEVEL SECURITY
@@ -209,6 +214,11 @@ CREATE POLICY "Users can insert own scans"
   ON scans FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+CREATE POLICY "Users can update own scans"
+  ON scans FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
 -- violations: users can only read violations from their own scans
 CREATE POLICY "Users can read own violations"
   ON violations FOR SELECT
@@ -220,10 +230,30 @@ CREATE POLICY "Users can read own violations"
     )
   );
 
+CREATE POLICY "Users can insert violations"
+  ON violations FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM scans
+      WHERE scans.id = violations.scan_id
+        AND scans.user_id = auth.uid()
+    )
+  );
+
 -- scan_pages: users can only read pages from their own scans
 CREATE POLICY "Users can read own scan pages"
   ON scan_pages FOR SELECT
   USING (
+    EXISTS (
+      SELECT 1 FROM scans
+      WHERE scans.id = scan_pages.scan_id
+        AND scans.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can insert scan pages"
+  ON scan_pages FOR INSERT
+  WITH CHECK (
     EXISTS (
       SELECT 1 FROM scans
       WHERE scans.id = scan_pages.scan_id

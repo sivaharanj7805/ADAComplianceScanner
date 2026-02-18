@@ -109,18 +109,18 @@ export default function SiteCard({ site }: SiteCardProps) {
       {/* Actions */}
       <div className="mt-4 flex items-center gap-2 border-t border-gray-100 pt-3">
         <Link
-          href={`/dashboard/sites/${site.id}/scan`}
+          href={`/sites/${site.id}`}
           className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-gray-800"
         >
           <Play className="h-3 w-3" />
-          Scan Now
+          View Site
         </Link>
         <Link
-          href={`/dashboard/sites/${site.id}`}
+          href={`/sites/${site.id}`}
           className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
         >
           <FileText className="h-3 w-3" />
-          View Report
+          Details
         </Link>
       </div>
     </div>

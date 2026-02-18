@@ -5,8 +5,6 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Globe,
-  Search,
-  FileText,
   Settings,
   Zap,
   ChevronLeft,
@@ -25,8 +23,6 @@ interface SidebarProps {
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/sites', label: 'Sites', icon: Globe },
-  { href: '/scans', label: 'Scans', icon: Search },
-  { href: '/reports', label: 'Reports', icon: FileText },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -141,7 +137,7 @@ export default function Sidebar({
             {plan === 'free' && (
               <li>
                 <Link
-                  href="/dashboard/upgrade"
+                  href="/pricing"
                   onClick={onCloseMobile}
                   className={`
                     flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors

@@ -60,8 +60,8 @@ export default function PagesScanChart({
                     <Tooltip
                         contentStyle={tooltipStyle}
                         labelFormatter={(label) => `Date: ${label}`}
-                        formatter={(value: number, name: string) => [
-                            value,
+                        formatter={(value: number | undefined, name: string | undefined) => [
+                            value ?? 0,
                             name === 'pagesScanned' ? 'Pages Scanned' : 'Pages Failed',
                         ]}
                     />
